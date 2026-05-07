@@ -85,13 +85,6 @@ function App() {
             <div className="brand-mark" />
             <span className="brand-name">SWE Pro Academy</span>
           </div>
-          <button className="collapse-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <rect x="2" y="4" width="12" height="1.5" rx="1" />
-              <rect x="2" y="7.25" width="12" height="1.5" rx="1" />
-              <rect x="2" y="10.5" width="12" height="1.5" rx="1" />
-            </svg>
-          </button>
         </div>
 
         <div className="progress-section">
