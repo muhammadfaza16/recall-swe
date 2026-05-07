@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ACADEMY_DATA } from './data'
 import type { Pillar, Topic } from './data'
 import ReactMarkdown from 'react-markdown'
