@@ -28,7 +28,9 @@ import {
   AlertTriangle,
   Code,
   Target,
-  ChevronDown
+  ChevronDown,
+  Sun,
+  Moon
 } from 'lucide-react'
 
 const PILLAR_ICONS: Record<number, React.ReactNode> = {
@@ -56,6 +58,18 @@ function App() {
   const [currentView, setCurrentView] = useState<'home' | 'topic'>('home')
   const [showScrollTop, setShowScrollTop] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
+  
+  const [isLight, setIsLight] = useState(() => localStorage.getItem('theme') === 'light')
+
+  useEffect(() => {
+    if (isLight) {
+      document.body.classList.add('light-theme')
+      localStorage.setItem('theme', 'light')
+    } else {
+      document.body.classList.remove('light-theme')
+      localStorage.setItem('theme', 'dark')
+    }
+  }, [isLight])
 
   // Persist completed topics
   useEffect(() => {
@@ -119,6 +133,9 @@ function App() {
             <div className="brand-mark" />
             <span className="brand-name">SWE Pro Academy</span>
           </div>
+          <button className="collapse-btn" onClick={() => setIsLight(!isLight)} aria-label="Toggle theme">
+            {isLight ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
         </div>
 
         <div className="progress-section">
@@ -177,7 +194,10 @@ function App() {
           <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
             <Menu size={24} />
           </button>
-          <span className="mobile-brand" onClick={goHome} style={{ cursor: 'pointer' }}>SWE Pro Academy</span>
+          <span className="mobile-brand" onClick={goHome} style={{ cursor: 'pointer', flex: 1 }}>SWE Pro Academy</span>
+          <button className="mobile-menu-btn" onClick={() => setIsLight(!isLight)} aria-label="Toggle theme">
+            {isLight ? <Moon size={22} /> : <Sun size={22} />}
+          </button>
         </div>
 
         <div className="content">
