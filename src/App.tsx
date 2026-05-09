@@ -3,9 +3,36 @@ import { ACADEMY_DATA } from './data'
 import type { Pillar, Topic } from './data'
 import ReactMarkdown from 'react-markdown'
 
-const PILLAR_ICONS: Record<number, string> = {
-  0: '🧱', 1: '⚙️', 2: '🌐', 3: '🗄️',
-  4: '🖥️', 5: '🟢', 6: '🐹', 7: '🚀',
+import { 
+  Home, 
+  BookOpen, 
+  Cpu, 
+  Globe, 
+  Database, 
+  Monitor, 
+  Server, 
+  Terminal, 
+  Settings,
+  CheckCircle2,
+  Circle,
+  Menu,
+  Book,
+  Lightbulb,
+  AlertTriangle,
+  Code,
+  Target,
+  ChevronDown
+} from 'lucide-react'
+
+const PILLAR_ICONS: Record<number, React.ReactNode> = {
+  0: <BookOpen size={18} />, 
+  1: <Cpu size={18} />, 
+  2: <Globe size={18} />, 
+  3: <Database size={18} />,
+  4: <Monitor size={18} />, 
+  5: <Server size={18} />, 
+  6: <Terminal size={18} />, 
+  7: <Settings size={18} />,
 }
 
 function App() {
@@ -102,7 +129,7 @@ function App() {
             className={`nav-item nav-home ${currentView === 'home' ? 'active' : ''}`}
             onClick={goHome}
           >
-            <span className="nav-icon">🏠</span>
+            <span className="nav-icon"><Home size={18} /></span>
             <span className="nav-title">Academy Home</span>
           </button>
 
@@ -121,16 +148,8 @@ function App() {
                     className={`nav-item ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
                     onClick={() => selectTopic(pillar, topic)}
                   >
-                    <span className="nav-check">
-                      {isDone ? (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="2,6 5,9 10,3" />
-                        </svg>
-                      ) : (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <circle cx="6" cy="6" r="4" />
-                        </svg>
-                      )}
+                    <span className="nav-check" style={{ display: 'flex', alignItems: 'center' }}>
+                      {isDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
                     </span>
                     <span className="nav-title">{topic.title}</span>
                   </button>
@@ -149,7 +168,7 @@ function App() {
         {/* MOBILE HEADER */}
         <div className="mobile-header">
           <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            <Menu size={24} />
           </button>
           <span className="mobile-brand" onClick={goHome} style={{ cursor: 'pointer' }}>SWE Pro Academy</span>
         </div>
@@ -198,7 +217,9 @@ function App() {
                       <div className="card-top">
                         <span className="card-icon">{PILLAR_ICONS[i]}</span>
                         {percent === 100 && (
-                          <span className="card-badge-done">✓ Complete</span>
+                          <span className="card-badge-done" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            <CheckCircle2 size={14} style={{ marginRight: '4px' }} /> Complete
+                          </span>
                         )}
                       </div>
                       <h3>{p.title.split('—')[1]?.trim() || p.title}</h3>
@@ -208,8 +229,8 @@ function App() {
                             className={completed.has(t.id) ? 'done' : ''}
                             onClick={() => selectTopic(p, t)}
                           >
-                            <span className="card-topic-check">
-                              {completed.has(t.id) ? '✓' : '○'}
+                            <span className="card-topic-check" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                              {completed.has(t.id) ? <CheckCircle2 size={16} /> : <Circle size={16} />}
                             </span>
                             {t.title}
                           </li>
@@ -257,7 +278,7 @@ function App() {
               {/* Theory */}
               <section className="section">
                 <div className="section-tag tag-blue">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  <Book size={14} />
                   Theory &amp; Internals
                 </div>
                 <div className="prose">
@@ -268,7 +289,7 @@ function App() {
               {/* Why */}
               <section className="section">
                 <div className="section-tag tag-amber">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <Lightbulb size={14} />
                   Why It Matters
                 </div>
                 <div className="callout callout-amber">
@@ -279,7 +300,7 @@ function App() {
               {/* Anti-pattern */}
               <section className="section">
                 <div className="section-tag tag-red">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <AlertTriangle size={14} />
                   Common Mistake
                 </div>
                 <div className="callout callout-red">
@@ -290,7 +311,7 @@ function App() {
               {/* Code */}
               <section className="section">
                 <div className="section-tag tag-green">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  <Code size={14} />
                   Implementation
                 </div>
                 <div className="code-block">
@@ -307,7 +328,7 @@ function App() {
               {/* Interview Q&A */}
               <section className="section">
                 <div className="section-tag tag-purple">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                  <Target size={14} />
                   Interview Q&amp;A
                 </div>
                 <div className="qa-list">
@@ -316,7 +337,7 @@ function App() {
                       <button className="qa-question" onClick={() => toggleQA(i)}>
                         <span className="qa-num">{String(i + 1).padStart(2, '0')}</span>
                         <span>{item.q}</span>
-                        <svg className="qa-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                        <ChevronDown className="qa-chevron" size={16} />
                       </button>
                       {openQA.has(i) && (
                         <div className="qa-answer">
