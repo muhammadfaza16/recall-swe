@@ -166,7 +166,7 @@ WHERE relname = 'orders' AND idx_scan = 0;`
       ],
       code: `// CACHE-ASIDE PATTERN (Node.js + Redis)
 async function getUserById(id: string): Promise<User | null> {
-    const cacheKey = \`user:v1:\${id}\`
+    const cacheKey = 'user:v1:' + id
 
     const cached = await redis.get(cacheKey)
     if (cached) return JSON.parse(cached)
@@ -181,7 +181,7 @@ async function getUserById(id: string): Promise<User | null> {
 // Invalidate on update — delete, don't update
 async function updateUser(id: string, data: Partial<User>) {
     await db.users.update({ where: { id }, data })
-    await redis.del(\`user:v1:\${id}\`)
+    await redis.del('user:v1:' + id)
 }
 
 // SINGLEFLIGHT: Prevent stampede at app level
@@ -273,6 +273,67 @@ await db.transaction(async (tx) => {
     })
 })
 // Separate CDC/polling process reads outbox and publishes to Kafka`
+    },
+    {
+      id: 'message-brokers',
+      title: 'Message Brokers & Event-Driven Architecture',
+      depth: 'Kafka vs RabbitMQ, append-only logs, consumer groups, delivery guarantees',
+      image: '/illustrations/architecture.png',
+      content: `Sistem monolitik memanggil service secara synchronous (REST/RPC). Kalau Service B mati, Service A error. Event-Driven Architecture memecahkan coupling ini menggunakan Message Broker (asynchronous).
+
+**RabbitMQ (Traditional Message Queue):** Push-model. Producer mengirim pesan ke Exchange, di-routing ke Queue. Consumer mengkonsumsi pesan dari Queue. Begitu pesan di-ACK oleh consumer, pesan DIHAPUS dari RabbitMQ. Cocok untuk task antrian tradisional (kirim email, generate PDF). 
+
+**Apache Kafka (Distributed Event Streaming):** Berbeda secara fundamental. Kafka adalah Distributed Append-Only Commit Log. Pesan dikirim ke Topic (di-split menjadi Partitions). Pesan TIDAK DIHAPUS setelah dibaca (bertahan sesuai retention policy, misal 7 hari). Consumer (Pull-model) membaca dari offset tertentu.
+- **Consumer Groups:** Sekelompok instance service yang sama berbagi pembacaan partisi. Jika Topic punya 4 Partitions dan Consumer Group punya 2 instances, masing-masing baca 2 partisi. Sangat scalable.
+- **Ordering Guarantee:** Kafka menjamin urutan pesan HANYA DI DALAM satu partisi yang sama. Jika lo mau event dari UserID=123 diproses berurutan, set UserID sebagai Partition Key.
+
+**Delivery Guarantees (Semantics):**
+1. **At-most-once:** Pesan dikirim, tidak peduli sampai atau tidak (bisa hilang).
+2. **At-least-once:** Pesan dijamin sampai, tapi bisa di-deliver BERKALI-KALI jika ada retry/failure sebelum ACK. (Sistem harus Idempotent!).
+3. **Exactly-once:** Paling susah dan mahal. Kafka mendukung ini lewat transactional API, tapi butuh setup ketat.`,
+      why: `Seni merancang arsitektur microservices adalah tentang mengelola komunikasi antar service. Mengerti kapan harus synchronous (gRPC) dan kapan harus asynchronous (Kafka/SQS) membedakan sistem yang rapuh (cascading failures) dari sistem yang tangguh.`,
+      mistake: `Menganggap At-least-once delivery berarti "semuanya aman". Di sistem terdistribusi, network request bisa timeout walau database udah terupdate, mengakibatkan broker mengirim pesan ulang. Jika consumer tidak dirancang **idempotent** (bisa menerima pesan yang sama berkali-kali tanpa efek samping ganda, misal: mengecek ID transaksi di DB sebelum memproses pembayaran), lo akan men-charge user 2 kali.`,
+      interview: [
+        {
+          q: 'Apa bedanya fundamental cara kerja RabbitMQ dan Kafka terkait penyimpanan pesan?',
+          a: 'RabbitMQ bertindak seperti antrian surat biasa (Smart Broker, Dumb Consumer). Saat pesan diberikan ke consumer dan di-acknowledge, RabbitMQ langsung menghapus pesan itu dari memori/disk. State ada di broker. Kafka bertindak seperti log file terdistribusi (Dumb Broker, Smart Consumer). Pesan yang ditulis ke Kafka ditambahkan (append) ke akhir log partition dan TIDAK dihapus ketika dibaca. Pesan bertahan sesuai waktu retention (misal 7 hari). Consumer yang menyimpan state "offset" (sampai baris mana dia sudah membaca). Ini memungkinkan consumer baru membaca ulang seluruh history dari awal, atau me-replay events kalau ada bug di aplikasi.'
+        },
+        {
+          q: 'Di Kafka, bagaimana cara memastikan event pembayaran untuk user yang sama diproses secara berurutan, padahal kita punya banyak consumer?',
+          a: 'Kafka HANYA menjamin urutan (ordering) di dalam satu partisi yang sama. Jika kita mengirim event ke topic secara round-robin, event user yang sama bisa masuk ke partisi berbeda, dibaca consumer berbeda secara paralel, dan urutannya kacau. Solusinya: saat Producer mengirim event, tetapkan "User ID" sebagai Partition Key. Hash dari key ini menentukan partisi mana yang akan menerima pesan. Dengan key yang sama, semua event milik satu User ID akan SELALU masuk ke Partisi X. Karena satu partisi di Kafka HANYA bisa dibaca oleh SATU consumer dalam satu Consumer Group pada satu waktu, event user tersebut pasti diproses berurutan oleh consumer tersebut.'
+        }
+      ],
+      code: `// KAFKA PRODUCER (Node.js/kafkajs)
+// Always use partitioning keys for ordering!
+await producer.send({
+    topic: 'payments-events',
+    messages: [
+        { 
+            key: userId, // CRITICAL: Ensures all events for this user go to SAME partition
+            value: JSON.stringify({ type: 'PAYMENT_SUCCESS', amount: 500 }) 
+        }
+    ],
+})
+
+// KAFKA CONSUMER (Idempotency example)
+await consumer.run({
+    eachMessage: async ({ topic, partition, message }) => {
+        const event = JSON.parse(message.value.toString())
+        const eventId = message.headers.eventId.toString() // Unique ID
+
+        // IDEMPOTENCY CHECK
+        // Using Redis SET NX to only process once
+        const isNew = await redis.set('processed:' + eventId, '1', 'NX', 'EX', 86400)
+        
+        if (!isNew) {
+            console.log('Skipping duplicate message')
+            return // Already processed!
+        }
+
+        await processPaymentLogic(event)
+        // Kafka consumer auto-commits offset after eachMessage completes
+    },
+})`
     }
   ]
 }

@@ -76,6 +76,80 @@ services:
       interval: 5s`
     },
     {
+      id: 'kubernetes-internals',
+      title: 'Kubernetes (K8s) Architecture',
+      depth: 'Control Plane, Kubelet, Pod lifecycle, Services, Ingress',
+      image: '/illustrations/docker.png',
+      content: `Docker menjalankan container di satu mesin. Bagaimana jika lo punya 100 mesin, ingin auto-scale, auto-restart jika mati, dan load balancing? Lo butuh Orchestrator. K8s adalah standar industri.
+
+**Control Plane (Master Node):** Otak K8s. 
+- **API Server:** Gerbang komunikasi, semua kubectl commands masuk ke sini.
+- **etcd:** Key-Value store terdistribusi yang menyimpan SELURUH state cluster (Source of Truth).
+- **Scheduler:** Memutuskan Node (mesin) mana yang cocok untuk menjalankan Pod baru (berdasarkan RAM/CPU request).
+- **Controller Manager:** Loop terus-menerus yang memastikan current state = desired state (misal: "Gue mau 3 replica". Kalau mati 1, dia bikin 1 lagi).
+
+**Data Plane (Worker Node):** Mesin yang menjalankan workload.
+- **Kubelet:** Agent di setiap node yang bicara ke API server dan mengurus container runtime (minta Docker/containerd nyalain container).
+- **Kube-Proxy:** Mengurus network routing rules (iptables/IPVS) di node agar traffic sampai ke Pod yang benar.
+
+**Konsep Inti:**
+- **Pod:** Unit terkecil K8s. Bisa berisi 1 atau lebih container yang share network (localhost) dan volume. Pod itu fana (ephemeral), bisa mati dan diganti IP-nya kapan saja.
+- **Deployment:** Mengelola replica set dari Pods dan memungkinkan zero-downtime rolling updates.
+- **Service:** Abstraksi network statis. Karena IP Pod selalu berubah, Service memberikan IP internal permanen (dan DNS name) yang me-loadbalance ke sekumpulan Pod.
+- **Ingress:** Pintu masuk (gateway) HTTP/S dari luar cluster ke internal Services berdasar URL/Host.`,
+      why: `Seni deployment modern nggak cuma "bisa jalan di lokal". Senior engineer harus mengerti siklus hidup aplikasinya di production. Jika aplikasi lo nyimpan state di memory lokal (bukan Redis), aplikasi itu bakal rusak parah saat di-scale di K8s karena K8s mengarahkan request ke Pod secara acak.`,
+      mistake: `Mengabaikan Resource Requests & Limits di manifest K8s. Jika lo tidak set memory Limit, aplikasi Java/Node lo bisa bocor memori dan memakan seluruh RAM host Node, membuat K8s Node NotReady dan merusak Pod lain di mesin yang sama (Noisy Neighbor). Jika lo set memory Limit tapi aplikasinya nggak sadar (unaware), Linux OOM-Killer akan membunuh container lo tanpa belas kasihan.`,
+      interview: [
+        {
+          q: 'Bagaimana cara Kubernetes mencapai Zero-Downtime Deployment?',
+          a: 'K8s menggunakan konsep Rolling Updates pada objek Deployment. Ketika kita push image versi baru, K8s tidak mematikan semua Pod lama sekaligus. K8s membuat ReplicaSet baru, lalu menyalakan 1 Pod versi baru. Setelah Pod baru itu berstatus "Ready" (melewati Readiness Probe), K8s mengarahkan trafik ke sana dan mematikan 1 Pod lama. Proses ini diulang satu per satu (dikontrol parameter maxUnavailable dan maxSurge) sampai semua Pod lama tergantikan. Jika Pod baru gagal (misal crashloop), deployment tertahan dan trafik tetap dilayani oleh sisa Pod lama, mencegah outage.'
+        },
+        {
+          q: 'Apa bedanya Liveness Probe dan Readiness Probe?',
+          a: 'Keduanya digunakan Kubelet untuk mengecek health aplikasi, tapi aksinya berbeda. Readiness Probe: Mengecek apakah aplikasi SIAP menerima trafik (misal: koneksi DB sudah tersambung). Jika gagal, Pod DIKELUARKAN dari daftar endpoint Service (tidak dikasih trafik HTTP), tapi containernya TIDAK di-restart. Liveness Probe: Mengecek apakah aplikasi masih HIDUP (tidak deadlock/hang). Jika gagal berturut-turut, Kubelet akan MEMBUNUH (kill) dan me-restart container tersebut. Kesalahan umum: menggunakan liveness probe yang mengecek koneksi DB. Jika DB lambat sementara, liveness probe gagal, dan K8s akan me-restart SEMUA pod kita tanpa henti, memperburuk keadaan.'
+        }
+      ],
+      code: `# KUBERNETES DEPLOYMENT MANIFEST
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+    spec:
+      containers:
+      - name: api
+        image: myapp:v1.2.0
+        ports:
+        - containerPort: 8080
+        resources:           # CRITICAL: Always define limits!
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:      # Trafik masuk hanya jika ini OK
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:       # Restart pod jika ini gagal
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10`
+    },
+    {
       id: 'system-design',
       title: 'System Design Fundamentals',
       depth: 'Scalability, CAP theorem, load balancing, consistent hashing',
@@ -113,7 +187,7 @@ class ConsistentHashRing {
 
     addServer(server: string) {
         for (let i = 0; i < this.virtualNodes; i++) {
-            const pos = this.hash(\`\${server}:vnode:\${i}\`)
+            const pos = this.hash(server + ':vnode:' + i)
             this.ring.set(pos, server)
         }
         this.sortedPositions = [...this.ring.keys()].sort((a, b) => a - b)

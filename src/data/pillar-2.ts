@@ -5,6 +5,51 @@ export const pillar2: Pillar = {
   title: 'Pillar 2 — Networking & Web',
   topics: [
     {
+      id: 'tcp-udp-dns',
+      title: 'TCP vs UDP & DNS Resolution',
+      depth: 'TCP 3-way handshake, congestion control, UDP trade-offs, DNS lifecycle',
+      content: `Setiap request HTTP berjalan di atas protokol transport (TCP/UDP) dan diawali dengan DNS resolution. Memahami layer ini membedakan engineer biasa dari engineer yang bisa mendebug high-latency issues.
+
+**DNS Resolution:** Sebelum TCP connect, browser harus tahu IP. Alurnya: Browser Cache → OS Cache → Router Cache → ISP Resolver → Root Server → TLD Server → Authoritative Name Server. Di production, DNS resolution time bisa jadi bottleneck. Solusinya: DNS caching, menggunakan GeoDNS/Anycast untuk mengarahkan user ke IP terdekat.
+
+**TCP (Transmission Control Protocol):** Connection-oriented dan reliable. Memiliki jaminan urutan data dan retransmission jika paket hilang. 
+1. **3-Way Handshake:** (SYN, SYN-ACK, ACK). Memakan waktu 1.5 RTT (Round Trip Time) HANYA untuk establish koneksi sebelum data dikirim.
+2. **Congestion Control & Slow Start:** TCP tidak langsung mengirim data pada bandwidth penuh. Ia memulai pelan-pelan (Slow Start) dan perlahan menaikkan window size sampai packet loss terjadi.
+3. **Head-of-Line (HoL) Blocking:** Jika satu paket hilang, TCP akan menghentikan seluruh stream data sampai paket itu dikirim ulang dan diterima.
+
+**UDP (User Datagram Protocol):** Connectionless, tidak ada jaminan sampai (fire and forget), tidak berurutan, tidak ada handshake. Sangat cepat. Digunakan untuk video streaming, gaming, atau statsd/metrics logging.
+
+**HTTP/3 & QUIC:** Berjalan di atas UDP, bukan TCP! QUIC mengimplementasikan reliability di user-space, menghilangkan TCP HoL blocking, dan memungkinkan 0-RTT handshake untuk TLS resumption.`,
+      why: `Saat API lo lambat tapi log server menunjukkan execution time cepat, masalahnya ada di network. Apakah itu TCP handshake overhead karena connection pooling tidak jalan? Apakah packet loss menyebabkan TCP backoff? Lo nggak bisa nge-debug ini kalau nggak paham layer 4 (Transport).`,
+      mistake: `Mengirim metrics/telemetry data dari app server ke monitoring system (seperti StatsD/Datadog) menggunakan TCP. Jika monitoring server down atau network lambat, TCP akan memblokir app server atau menghabiskan resources untuk retries. Gunakan UDP untuk telemetry — kehilangan beberapa data point lebih baik daripada aplikasi mati.`,
+      interview: [
+        {
+          q: 'Apa itu TCP Slow Start dan bagaimana pengaruhnya terhadap performa API?',
+          a: 'TCP Slow Start adalah mekanisme di mana TCP memulai koneksi baru dengan mengirim data dalam jumlah kecil (biasanya 10 segment), lalu melipatgandakan jumlahnya (exponential growth) setelah menerima ACK, sampai mencapai network capacity. Pengaruhnya: untuk request API yang datanya kecil dan short-lived (seperti REST calls biasa), performanya selalu dibatasi oleh Slow Start, bukan bandwidth maksimal network. Inilah mengapa HTTP Keep-Alive (me-reuse koneksi TCP yang sudah "hangat" / window size besar) sangat krusial untuk performa API.'
+        },
+        {
+          q: 'Mengapa HTTP/3 berpindah dari TCP ke UDP?',
+          a: 'HTTP/2 menggunakan TCP. Masalah utamanya adalah TCP Head-of-Line (HoL) Blocking. HTTP/2 me-multiplex banyak HTTP request ke dalam SATU koneksi TCP. Jika satu paket TCP hilang di tengah jalan, OS akan menahan seluruh byte stream setelahnya sampai paket itu di-retransmit, sehingga SEMUA HTTP request di koneksi itu ikut macet, meskipun paket mereka sendiri sudah sampai. HTTP/3 menggunakan QUIC di atas UDP. QUIC mengelola stream independen: jika paket untuk Stream A hilang, hanya Stream A yang menunggu, Stream B dan C tetap diproses. Selain itu, QUIC menggabungkan TCP handshake dan TLS handshake menjadi lebih efisien (bisa 0-RTT).'
+        }
+      ],
+      code: `// DIAGNOSING NETWORK WITH CURL
+// curl -w "@curl-format.txt" -o /dev/null -s "https://api.github.com"
+//
+// curl-format.txt:
+// time_namelookup:  %{time_namelookup}s
+// time_connect:  %{time_connect}s        (TCP Handshake)
+// time_appconnect:  %{time_appconnect}s  (TLS Handshake)
+// time_pretransfer:  %{time_pretransfer}s
+// time_starttransfer:  %{time_starttransfer}s (TTFB)
+// time_total:  %{time_total}s
+//
+// Output example:
+// time_namelookup:  0.035s (DNS took 35ms)
+// time_connect:  0.075s    (TCP took 40ms)
+// time_appconnect:  0.155s (TLS took 80ms)
+// time_starttransfer:  0.250s (Server processing took 95ms)`
+    },
+    {
       id: 'http-internals',
       title: 'HTTP/S, TLS & the Full Request Lifecycle',
       depth: 'DNS, TCP, TLS 1.3, HTTP/2, HTTP/3',
@@ -37,7 +82,7 @@ export const pillar2: Pillar = {
       code: `// NODE.JS: Connection Pooling (CRITICAL for microservices)
 // BAD: New TCP connection per request
 async function callService(id: string) {
-    const res = await fetch(\`http://user-service/users/\${id}\`)
+    const res = await fetch('http://user-service/users/' + id)
     return res.json()
 }
 
@@ -50,7 +95,7 @@ const pool = new Pool('http://user-service', {
 })
 
 async function callService(id: string) {
-    const { body } = await pool.request({ path: \`/users/\${id}\`, method: 'GET' })
+    const { body } = await pool.request({ path: '/users/' + id, method: 'GET' })
     return body.json()
 }
 
@@ -108,11 +153,11 @@ app.post('/payments', async (req, res) => {
     if (!idempotencyKey) return res.status(400).json({ error: { code: 'MISSING_IDEMPOTENCY_KEY' } })
 
     // Atomic: only first caller processes, rest get cached result
-    const cached = await redis.get(\`idem:\${idempotencyKey}\`)
+    const cached = await redis.get('idem:' + idempotencyKey)
     if (cached) return res.status(200).json(JSON.parse(cached))
 
     const result = await processPayment(req.body)
-    await redis.setex(\`idem:\${idempotencyKey}\`, 86400, JSON.stringify(result))
+    await redis.setex('idem:' + idempotencyKey, 86400, JSON.stringify(result))
     return res.status(201).json(result)
 })
 
@@ -135,6 +180,67 @@ app.get('/posts', async (req, res) => {
         : null
 
     res.json({ data: items, meta: { hasNext, cursor: nextCursor } })
+})`
+    },
+    {
+      id: 'grpc-websockets',
+      title: 'gRPC, Protobufs & WebSockets',
+      depth: 'Binary serialization, multiplexing, bidirectional streaming',
+      content: `REST + JSON sangat bagus untuk public API, tapi untuk internal microservices atau real-time apps, REST memiliki overhead besar.
+
+**Protocol Buffers (Protobufs):** Format serialisasi biner dari Google. Di REST, kita kirim string JSON (raw text, butuh parsing mahal, ukuran besar). Di Protobuf, kita mendefinisikan skema (.proto) dan meng-compile menjadi struct/class di berbagai bahasa. Data dikirim dalam format biner yang sangat padat dan cepat di-parse. 
+
+**gRPC:** Remote Procedure Call framework yang menggunakan HTTP/2 dan Protobuf. Keunggulan:
+1. **Performa:** Payload biner (Protobuf) + HTTP/2 multiplexing (banyak request dalam 1 TCP connection).
+2. **Streaming:** Mendukung Unary (request/response biasa), Client streaming, Server streaming, dan Bidirectional streaming.
+3. **Strongly Typed Contracts:** File .proto menjadi sumber kebenaran (Source of Truth) antar tim. Tidak perlu lagi bingung tipe data apa yang dikirim.
+
+**WebSockets:** Protokol di atas TCP untuk full-duplex, bidirectional communication antara browser dan server. Diawali dengan HTTP Upgrade request, lalu koneksi TCP tetap terbuka.
+Kapan pakai WebSockets? Chat apps, live sports updates, collaborative editing (Google Docs).
+Kapan TIDAK pakai WebSockets? Jika lo cuma butuh server → client updates sesekali, gunakan Server-Sent Events (SSE) via HTTP biasa. WebSockets stateful dan jauh lebih susah di-scale (membutuhkan sticky sessions atau Redis Pub/Sub untuk sinkronisasi antar server instances).`,
+      why: `Microservices yang saling memanggil via REST/JSON pada high scale akan membuang 30-40% CPU hanya untuk JSON parsing dan string allocation. Pindah ke gRPC sering kali memotong latency internal hingga 5x.`,
+      mistake: `Menggunakan WebSockets untuk segala jenis komunikasi "real-time", padahal cuma butuh one-way server push. WebSockets butuh ping/pong keep-alive, susah di-load balance, dan memakan resource file descriptor terus-menerus. Jika data cuma mengalir dari server ke client, Server-Sent Events (SSE) jauh lebih ringan, bisa berjalan di atas HTTP/2, dan gampang di-cache/load-balance.`,
+      interview: [
+        {
+          q: 'Bagaimana cara load balancing koneksi gRPC? Mengapa layer 4 (TCP) load balancer tidak cukup?',
+          a: 'gRPC menggunakan HTTP/2 yang menahan HANYA SATU koneksi TCP persisten dan me-multiplex semua request di atasnya. Jika kita menggunakan L4 Load Balancer (seperti AWS NLB atau HAProxy TCP mode), balancer hanya melihat koneksi TCP awal dan akan mengirimkan SELURUH trafik gRPC dari client tersebut ke SATU server backend saja (uneven load). Untuk me-load balance gRPC, kita HARUS menggunakan L7 Load Balancer (seperti Envoy, Nginx gRPC module, AWS ALB) yang bisa memahami frame HTTP/2 dan mendistribusikan individual gRPC calls ke backend yang berbeda, ATAU menggunakan client-side load balancing (client punya list IP backend dan round-robin secara lokal).'
+        },
+        {
+          q: 'Jelaskan trade-off antara REST/JSON vs gRPC/Protobuf untuk internal microservices.',
+          a: 'REST/JSON human-readable, mudah di-debug (bisa pakai curl/Postman langsung), dan universal didukung web client. Tapi payloadnya membengkak (keys diulang setiap objek) dan JSON parsing sangat CPU-intensive. gRPC/Protobuf sangat efisien (biner, ukuran kecil), type-safe dengan skema ketat, backwards compatible (asal tidak menghapus/mengubah field number lama), dan mendukung streaming. Trade-off utamanya: gRPC tidak human-readable (susah debug network sniffing), butuh tooling khusus (grpcurl), dan sulit dikonsumsi langsung oleh web browser tanpa gRPC-Web proxy (karena browser tidak mengekspos HTTP/2 frames).'
+        }
+      ],
+      code: `// gRPC: Protobuf Definition (user.proto)
+// syntax = "proto3";
+// package users;
+// 
+// service UserService {
+//   rpc GetUser (UserRequest) returns (UserResponse) {}
+//   rpc StreamUsers (UserRequest) returns (stream UserResponse) {}
+// }
+// 
+// message UserRequest { string id = 1; }
+// message UserResponse {
+//   string id = 1;
+//   string name = 2;
+//   string email = 3;
+// }
+
+// SSE (Server-Sent Events) - Simple 1-way Realtime
+app.get('/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    
+    // Send initial connection message
+    res.write('data: {"status": "connected"}\n\n')
+    
+    // Send event every 2 seconds
+    const timer = setInterval(() => {
+        res.write('data: {"time": "' + new Date().toISOString() + '"}\n\n')
+    }, 2000)
+    
+    req.on('close', () => clearInterval(timer))
 })`
     },
     {
@@ -224,6 +330,65 @@ const authorize = (...roles: string[]) =>
     }
 
 router.delete('/users/:id', authenticate, authorize('admin'), deleteUser)`
+    },
+    {
+      id: 'web-security',
+      title: 'Web Security & Attack Vectors',
+      depth: 'XSS, CSRF, JWT signing vulns, Rate Limiting, SQLi mitigation',
+      content: `Sistem yang scalable tidak berguna kalau bisa dibobol dalam 5 menit. Senior engineer wajib memahami top attack vectors (OWASP) dan cara memitigasinya di level arsitektur.
+
+**XSS (Cross-Site Scripting):** Attacker menyuntikkan script JS berbahaya ke halaman web user lain. Mitigasi: Jangan pernah percaya user input. Gunakan framework modern (React/Vue otomatis escape HTML variables), sanitasi HTML menggunakan library seperti DOMPurify jika menerima input rich-text, dan terapkan Content Security Policy (CSP) header untuk membatasi domain eksekusi script.
+
+**CSRF (Cross-Site Request Forgery):** Attacker menipu browser user untuk mengirim request ke situs lo saat user masih login (misal via hidden form auto-submit di web attacker). Mitigasi: 
+1. Gunakan SameSite=Lax atau Strict pada cookie session.
+2. Gunakan CSRF Token (Anti-Forgery Token) yang digenerate server dan harus dikirim bersama form POST.
+
+**JWT Vulnerabilities:** JWT bukan sihir. Isinya cuma Base64, BISA dibaca siapa saja, JANGAN simpan data sensitif di payload. Masalah umum: algoritma 'none' diterima server, membocorkan secret key, atau JWT tidak bisa di-revoke (karena stateless). Mitigasi revocation: simpan JWT JTI (ID) di Redis blocklist, atau gunakan token umur sangat pendek (15 menit) + Refresh Token.
+
+**Rate Limiting & Throttling:** Mencegah brute-force dan DDoS ringan. Algoritma populer:
+- **Token Bucket:** Setiap user punya 'ember' token yang terisi seiring waktu. Request pakai token. (Cocok untuk burst traffic).
+- **Fixed Window:** Max 100 req per menit per IP, reset di menit baru. (Masalah: burst 200 req di detik perpindahan menit).
+- **Sliding Window:** Kombinasi yang lebih smooth, melihat rata-rata req di jendela waktu bergerak.`,
+      why: `Satu celah keamanan bisa menghancurkan reputasi perusahaan yang dibangun bertahun-tahun. Security bukan sekadar "tugas tim InfoSec", melainkan tanggung jawab arsitektural engineer dari awal mendesain API.`,
+      mistake: `Menyimpan JWT Token di localStorage. Local storage BISA diakses oleh script apapun di domain lo (rentan XSS). Jika ada XSS, token lo langsung dicuri. Best practice: simpan JWT di httpOnly cookie. Cookie httpOnly TIDAK BISA dibaca oleh JavaScript (kebal pencurian via XSS), dan gunakan attribut Secure + SameSite untuk melindunginya dari CSRF.`,
+      interview: [
+        {
+          q: 'Bagaimana cara kerjanya cookie httpOnly dan apa kaitannya dengan XSS vs CSRF?',
+          a: 'Cookie httpOnly memberi tahu browser bahwa cookie tersebut DILARANG keras diakses melalui JavaScript (document.cookie). Ini memitigasi serangan XSS, karena attacker yang berhasil menyuntikkan JS ke web kita tidak akan bisa mencuri session token tersebut. TAPI, cookie (termasuk httpOnly) secara otomatis disertakan oleh browser ke setiap request ke domain asalnya. Ini membuat aplikasi rentan terhadap CSRF (attacker membuat form di webnya, submit ke web kita, browser tetap mengirim cookie itu). Jadi, httpOnly mencegah pencurian token via XSS, tapi membutuhkan perlindungan tambahan (seperti atribut SameSite atau Anti-CSRF tokens) untuk melawan CSRF.'
+        },
+        {
+          q: 'Jelaskan bagaimana Token Bucket algorithm bekerja untuk Rate Limiting.',
+          a: 'Bayangkan sebuah ember yang bisa menampung maksimal N token (kapasitas). Token ditambahkan ke ember dengan laju konstan R token per detik. Saat sebuah request masuk, ia membutuhkan 1 token. Jika ember punya token, ambil 1 token dan proses request. Jika ember kosong, reject request (HTTP 429 Too Many Requests). Keuntungan Token Bucket: memungkinkan "bursts" (ledakan request sesaat) selama tidak melebihi kapasitas N, namun membatasi laju rata-rata jangka panjang sesuai R. Implementasi umum di Redis menggunakan Lua script agar atomic (membaca jumlah token, mengecek waktu terakhir, menambah token sesuai waktu berlalu, mengurangi 1, dan menyimpan kembali dalam satu transaksi).'
+        }
+      ],
+      code: `// BASIC RATE LIMITER (Redis Token Bucket using Lua Script)
+const TOKEN_BUCKET_SCRIPT = 
+    'local key = KEYS[1] ' +
+    'local capacity = tonumber(ARGV[1]) ' +
+    'local refill_rate = tonumber(ARGV[2]) ' +
+    'local now = tonumber(ARGV[3]) ' +
+    'local requested = tonumber(ARGV[4]) ' +
+    'local bucket = redis.call("HMGET", key, "tokens", "last_refill") ' +
+    'local tokens = tonumber(bucket[1]) or capacity ' +
+    'local last_refill = tonumber(bucket[2]) or now ' +
+    'local time_passed = math.max(0, now - last_refill) ' +
+    'local refill_amount = math.floor(time_passed * refill_rate) ' +
+    'tokens = math.min(capacity, tokens + refill_amount) ' +
+    'if tokens >= requested then ' +
+    '  tokens = tokens - requested ' +
+    '  redis.call("HMSET", key, "tokens", tokens, "last_refill", now) ' +
+    '  redis.call("EXPIRE", key, math.ceil(capacity / refill_rate)) ' +
+    '  return 1 ' +
+    'else return 0 end'
+
+async function checkRateLimit(userId: string) {
+    const now = Math.floor(Date.now() / 1000)
+    // Capacity 10, refill 1 per sec
+    const result = await redis.eval(
+        TOKEN_BUCKET_SCRIPT, 1, 'rate:' + userId, 10, 1, now, 1
+    )
+    return result === 1
+}`
     }
   ]
 }
