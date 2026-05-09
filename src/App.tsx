@@ -1,7 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { ACADEMY_DATA } from './data'
 import type { Pillar, Topic } from './data'
-import ReactMarkdown from 'react-markdown'
+
+const ReactMarkdown = lazy(() => import('react-markdown'))
+
+const MarkdownRenderer = ({ children }: { children: string }) => (
+  <Suspense fallback={<div style={{ opacity: 0.5, padding: '0.5rem 0' }}>Loading content...</div>}>
+    <ReactMarkdown>{children}</ReactMarkdown>
+  </Suspense>
+)
 
 import { 
   Home, 
@@ -282,7 +289,7 @@ function App() {
                   Theory &amp; Internals
                 </div>
                 <div className="prose">
-                  <ReactMarkdown>{activeTopic.content}</ReactMarkdown>
+                  <MarkdownRenderer>{activeTopic.content}</MarkdownRenderer>
                 </div>
               </section>
 
@@ -293,7 +300,7 @@ function App() {
                   Why It Matters
                 </div>
                 <div className="callout callout-amber">
-                  <ReactMarkdown>{activeTopic.why}</ReactMarkdown>
+                  <MarkdownRenderer>{activeTopic.why}</MarkdownRenderer>
                 </div>
               </section>
 
@@ -304,7 +311,7 @@ function App() {
                   Common Mistake
                 </div>
                 <div className="callout callout-red">
-                  <ReactMarkdown>{activeTopic.mistake}</ReactMarkdown>
+                  <MarkdownRenderer>{activeTopic.mistake}</MarkdownRenderer>
                 </div>
               </section>
 
@@ -341,7 +348,7 @@ function App() {
                       </button>
                       {openQA.has(i) && (
                         <div className="qa-answer">
-                          <ReactMarkdown>{item.a}</ReactMarkdown>
+                          <MarkdownRenderer>{item.a}</MarkdownRenderer>
                         </div>
                       )}
                     </div>
