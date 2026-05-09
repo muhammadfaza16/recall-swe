@@ -55,11 +55,12 @@ function App() {
   })
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768)
   const [openQA, setOpenQA] = useState<Set<number>>(new Set())
-  const [currentView, setCurrentView] = useState<'home' | 'topic'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'topic' | 'pillar'>('home')
   const [showScrollTop, setShowScrollTop] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   
   const [isLight, setIsLight] = useState(() => localStorage.getItem('theme') === 'light')
+  const [deliveryTone, setDeliveryTone] = useState<'formal' | 'casual'>(() => (localStorage.getItem('tone') as 'formal' | 'casual') || 'formal')
 
   useEffect(() => {
     if (isLight) {
@@ -70,6 +71,10 @@ function App() {
       localStorage.setItem('theme', 'dark')
     }
   }, [isLight])
+
+  useEffect(() => {
+    localStorage.setItem('tone', deliveryTone)
+  }, [deliveryTone])
 
   // Persist completed topics
   useEffect(() => {
@@ -101,6 +106,13 @@ function App() {
     setActiveTopic(topic)
     setCurrentView('topic')
     setOpenQA(new Set())
+    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    if (window.innerWidth <= 768) setSidebarOpen(false)
+  }
+
+  function selectPillar(pillar: Pillar) {
+    setActivePillar(pillar)
+    setCurrentView('pillar')
     mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     if (window.innerWidth <= 768) setSidebarOpen(false)
   }
@@ -240,7 +252,7 @@ function App() {
                   const pTotal = p.topics.length
                   const percent = Math.round((pCompleted / pTotal) * 100)
                   return (
-                    <div key={p.id} className="home-card">
+                    <div key={p.id} className="home-card" onClick={() => selectPillar(p)} style={{ cursor: 'pointer' }}>
                       <div className="card-top">
                         <span className="card-icon">{PILLAR_ICONS[i]}</span>
                         {percent === 100 && (
@@ -254,7 +266,10 @@ function App() {
                         {p.topics.map(t => (
                           <li key={t.id}
                             className={completed.has(t.id) ? 'done' : ''}
-                            onClick={() => selectTopic(p, t)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectTopic(p, t);
+                            }}
                           >
                             <span className="card-topic-check" style={{ display: 'inline-flex', alignItems: 'center' }}>
                               {completed.has(t.id) ? <CheckCircle2 size={16} /> : <Circle size={16} />}
@@ -275,6 +290,50 @@ function App() {
                 })}
               </div>
             </div>
+          ) : currentView === 'pillar' ? (
+            /* ───────────── PILLAR VIEW ───────────── */
+            <div className="topic-view">
+              <nav className="breadcrumb">
+                <button onClick={goHome}>Home</button>
+                <span className="bc-sep">/</span>
+                <span className="bc-current">{activePillar.title.split('—')[1]?.trim() || activePillar.title}</span>
+              </nav>
+
+              <header className="topic-header">
+                <div className="topic-pillar">Learning Pillar</div>
+                <h1>{activePillar.title}</h1>
+                <p className="topic-depth" style={{ marginTop: '1rem', fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+                  A core pillar of the SWE Academy. Master these fundamental topics to build a robust engineering foundation.
+                </p>
+              </header>
+
+              <section className="section" style={{ marginTop: '2rem' }}>
+                <div className="section-tag tag-blue">
+                  <Book size={14} />
+                  Curriculum Topics
+                </div>
+                <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {activePillar.topics.map(t => {
+                    const isDone = completed.has(t.id)
+                    return (
+                      <div 
+                        key={t.id} 
+                        className={`topic-list-card ${isDone ? 'done' : ''}`}
+                        onClick={() => selectTopic(activePillar, t)}
+                      >
+                        <div>
+                          <h3>{t.title}</h3>
+                          <p>{t.depth}</p>
+                        </div>
+                        <div className="icon-status">
+                          {isDone ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
           ) : (
             /* ───────────── TOPIC VIEW ───────────── */
             <div className="topic-view">
@@ -282,7 +341,7 @@ function App() {
               <nav className="breadcrumb">
                 <button onClick={goHome}>Home</button>
                 <span className="bc-sep">/</span>
-                <button onClick={() => selectTopic(activePillar, activePillar.topics[0])}>
+                <button onClick={() => selectPillar(activePillar)}>
                   {activePillar.title.split('—')[1]?.trim() || activePillar.title}
                 </button>
                 <span className="bc-sep">/</span>
@@ -293,6 +352,48 @@ function App() {
                 <div className="topic-pillar">{activePillar.title}</div>
                 <h1>{activeTopic.title}</h1>
                 <p className="topic-depth">{activeTopic.depth}</p>
+
+                <div className="tone-toggler" style={{ 
+                  display: 'flex', 
+                  gap: '0.5rem', 
+                  marginTop: '1.5rem', 
+                  background: 'var(--bg-card)',
+                  padding: '0.5rem',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border)',
+                  width: 'fit-content'
+                }}>
+                  <button 
+                    onClick={() => setDeliveryTone('formal')}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '8px', 
+                      background: deliveryTone === 'formal' ? 'var(--bg-elevated)' : 'transparent',
+                      color: deliveryTone === 'formal' ? 'var(--text)' : 'var(--text-secondary)',
+                      border: deliveryTone === 'formal' ? '1px solid var(--border)' : '1px solid transparent',
+                      fontWeight: deliveryTone === 'formal' ? 600 : 400,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Academic Tone
+                  </button>
+                  <button 
+                    onClick={() => setDeliveryTone('casual')}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '8px', 
+                      background: deliveryTone === 'casual' ? 'var(--bg-elevated)' : 'transparent',
+                      color: deliveryTone === 'casual' ? 'var(--text)' : 'var(--text-secondary)',
+                      border: deliveryTone === 'casual' ? '1px solid var(--border)' : '1px solid transparent',
+                      fontWeight: deliveryTone === 'casual' ? 600 : 400,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Senior Eng Tone (Edgy)
+                  </button>
+                </div>
               </header>
 
               {/* Illustration */}
@@ -309,7 +410,7 @@ function App() {
                   Theory &amp; Internals
                 </div>
                 <div className="prose">
-                  <MarkdownRenderer>{activeTopic.content}</MarkdownRenderer>
+                  <MarkdownRenderer>{deliveryTone === 'casual' && activeTopic.content_casual ? activeTopic.content_casual : activeTopic.content}</MarkdownRenderer>
                 </div>
               </section>
 
@@ -320,7 +421,7 @@ function App() {
                   Why It Matters
                 </div>
                 <div className="callout callout-amber">
-                  <MarkdownRenderer>{activeTopic.why}</MarkdownRenderer>
+                  <MarkdownRenderer>{deliveryTone === 'casual' && activeTopic.why_casual ? activeTopic.why_casual : activeTopic.why}</MarkdownRenderer>
                 </div>
               </section>
 
@@ -331,7 +432,7 @@ function App() {
                   Common Mistake
                 </div>
                 <div className="callout callout-red">
-                  <MarkdownRenderer>{activeTopic.mistake}</MarkdownRenderer>
+                  <MarkdownRenderer>{deliveryTone === 'casual' && activeTopic.mistake_casual ? activeTopic.mistake_casual : activeTopic.mistake}</MarkdownRenderer>
                 </div>
               </section>
 

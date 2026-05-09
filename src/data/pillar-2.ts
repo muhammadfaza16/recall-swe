@@ -11,6 +11,9 @@ export const pillar2: Pillar = {
       content: 'OSI (Open Systems Interconnection) Model adalah kerangka konseptual 7 lapis tentang bagaimana sistem jaringan berkomunikasi. Ini mental model wajib untuk networking.\n\n**Layer 1 (Physical):** Kabel fisik, fiber optik, sinyal WiFi (Bit: 1 dan 0).\n**Layer 2 (Data Link):** Komunikasi antar *node* yang berdekatan di jaringan yang sama menggunakan MAC Address (Switch). Unit: Frame.\n**Layer 3 (Network):** Routing data melintasi berbagai jaringan di seluruh dunia menggunakan IP Address (Router). Unit: Packet.\n**Layer 4 (Transport):** Memastikan data sampai ke port aplikasi yang benar. Di sinilah **TCP** (andal, berurutan) dan **UDP** (cepat, fire-and-forget) beroperasi. Unit: Segment.\n**Layer 5 (Session) & 6 (Presentation):** Menjaga sesi komunikasi dan format data (enkripsi SSL/TLS sering dianggap di sini atau antara L4/L7).\n**Layer 7 (Application):** Aplikasi itu sendiri. Di sinilah **HTTP, gRPC, WebSocket, SMTP** beroperasi.\n\n**L4 vs L7 Load Balancer:** L4 LB (seperti AWS NLB) hanya melihat IP dan Port (sangat cepat, buta terhadap isi data). L7 LB (seperti AWS ALB atau Nginx) bisa melihat isi HTTP Header (bisa merouting ke server berbeda berdasarkan URL `/api` atau `/images`).',
       why: 'Saat API Anda lambat, masalahnya bisa di L7 (query lambat), di L4 (TCP handshake lambat), atau L3 (routing internet/DNS bermasalah). Memahami OSI Model memandu proses *troubleshooting* dari atas ke bawah.',
       mistake: 'Mencoba melakukan load balancing pada trafik gRPC menggunakan L4 Load Balancer klasik. gRPC menahan koneksi TCP tetap hidup (multiplexing). L4 LB hanya melakukan balance pada awal TCP connection, sehingga semua traffic gRPC akan menumpuk di satu server backend. Harus menggunakan L7 LB.',
+      content_casual: 'Kalau API lo lemot, nyalahin kodenya itu gampang. Tapi engineer kelas kakap bakal ngecek pipanya dulu. OSI Model itu mental model wajib buat ngebayangin gimana data lo jalan dari kabel ke layar.\n\n**Layer 1-3 (Infrastruktur Fisik & Routing):** Di bawah itu ada kabel optik (L1), Switch buat lokal (L2), dan Router pencari jalan antar negara pakai IP Address (L3).\n**Layer 4 (Transport):** Pintu masuk. Di sini ada TCP yang cerewet nanyain "paketnya utuh nggak?" (handshake lambat, tapi garansi) dan UDP yang main lempar aja (super cepat buat game/video).\n**Layer 7 (Application):** HTTP, WebSocket, gRPC ada di sini. Di sini data udah punya bentuk dan makna.\n\n**Load Balancer L4 vs L7:** L4 LB (kayak AWS NLB) cuma lihat IP/Port terus langsung oper. Super enteng, buta isi data. L7 LB (Nginx/ALB) ngebongkar amplop HTTP lo, ngecek URL path `/api` ke backend A, `/images` ke S3. Pinter, tapi makan CPU.',
+      why_casual: 'Waktu server production lo down, lo bakal bingung: "Ini karena koneksi putus (L4) atau query DB gue yang nyangkut (L7)?". Paham OSI Model itu kunci utama buat ngerti log infrastructure dan nentuin bottleneck ada di mana.',
+      mistake_casual: 'Nge-load balance traffic gRPC pakai L4 Load Balancer klasik. Karena gRPC cuma bikin satu koneksi TCP panjang (multiplexing), L4 cuma jalan di awal doang! Akibatnya semua *traffic* lo numpuk muntah di satu server backend yang sama. Wajib pake L7 LB!',
       interview: [
         {
           q: 'Jelaskan perbedaan mendasar antara Layer 4 Load Balancer dan Layer 7 Load Balancer.',
@@ -26,6 +29,9 @@ export const pillar2: Pillar = {
       content: 'Sebelum pusing dengan JWT dan OAuth, pahami batasan paling dasar di browser.\n\n**SOP & CORS:** Browser memiliki mekanisme keamanan *Same-Origin Policy (SOP)*. Script di `domain-a.com` dilarang membaca data dari `domain-b.com`. Tapi seringkali kita butuh akses tersebut (misal frontend dan backend pisah domain). Solusinya: **CORS (Cross-Origin Resource Sharing)**. Server `domain-b.com` harus mengirimkan header `Access-Control-Allow-Origin: https://domain-a.com`.\n**Preflight Request:** Jika request Anda kompleks (misal menggunakan metode PUT/DELETE atau header kustom seperti `Authorization`), browser akan mengirimkan request `OPTIONS` (Preflight) terlebih dahulu untuk bertanya ke server "Bolehkah saya mengirim request ini?". Jika server menjawab "Boleh", baru request aslinya dikirim.\n\n**Stateful Sessions vs Stateless:**\n- **Session (Stateful):** User login -> Server menyimpan data user di memory/DB dan memberikan `Session ID` ke browser -> Browser menyimpan di *Cookie* dan otomatis mengirimkannya di request berikutnya. Kelemahan: Jika server di-restart atau user masuk ke server lain (load balancing), session hilang (kecuali pakai Redis).\n- **Token (Stateless):** Server tidak menyimpan apa-apa. Semua data user dienkripsi/di-sign ke dalam Token (JWT) dan diberikan ke klien. Klien mengirimkannya lewat header. Skalabilitas tinggi, tapi token sulit di-revoke/dibatalkan sebelum expired.',
       why: 'CORS error adalah mimpi buruk paling umum bagi web developer baru. Paham bahwa CORS adalah mekanisme browser (bukan server) akan mengubah cara Anda men-debug. Memahami Session vs Token adalah akar dari semua perdebatan arsitektur autentikasi.',
       mistake: 'Mengira bahwa men-disable CORS di server berarti membuat server aman. Salah! CORS adalah proteksi untuk *client/browser*. Script bot (curl, postman) mengabaikan aturan CORS dan bisa menembak server Anda kapan saja jika tidak dilindungi autentikasi.',
+      content_casual: 'Sebelum ngehalu ngebangun arsitektur Microservices + OAuth, lo wajib paham hukum rimba di dalam browser (CORS) dan cara ngenalin user lo.\n\n**SOP & CORS:** Browser itu paranoid. Dia punya *Same-Origin Policy (SOP)* yang ngelarang script di `domain-A` maling data dari `domain-B`. Kalau lo beneran mau nyambungin Frontend Beda Domain ke Backend lo, lo butuh **CORS**. Intinya backend lo harus ngasih stempel *"Gue izinin domain-A akses"*. Kalau requestnya aneh-aneh (bukan GET biasa), browser bakal nembak request `OPTIONS` (Preflight) dulu nanya izin.\n\n**Stateful (Session) vs Stateless (Token):**\n- **Session:** Lo masuk, server nyatet di buku (Redis/Memory), terus ngasih lo KTP (Session ID) di Cookie. Tiap request, lo bawa KTP itu. Kalau server restart, catetan ilang = lo ke-logout.\n- **Token (JWT):** Server males nyatet. Dia ngasih lo KTP digital yang udah di-stempel rahasia (JWT). Lo kirim Token itu terus. Skalabel banget buat microservice, tapi PR gedenya: Token ini nggak bisa ditarik balik sebelum *expired*!',
+      why_casual: 'CORS error di console merah-merah itu musuh abadi junior dev. Kalau lo sadar CORS itu cuma proteksi browser (bukan server lo yang error), lo bakal ketawa ngedebugnya. Debat Session vs Token juga akar perkelahian engineer tiap milih arsitektur autentikasi.',
+      mistake_casual: 'Menghindari CORS error di *production* dengan pasang `Access-Control-Allow-Origin: *`. Ini sama aja buka gembok pintu rumah lebar-lebar. Web apapun di dunia bisa bikin API request atas nama user lo yang lagi login di browser!',
       interview: [
         {
           q: 'Kenapa tiba-tiba browser mengirimkan method OPTIONS sebelum request POST saya?',
@@ -52,6 +58,20 @@ export const pillar2: Pillar = {
 **HTTP/3 & QUIC:** Berjalan di atas UDP, bukan TCP! QUIC mengimplementasikan reliability di user-space, menghilangkan TCP HoL blocking, dan memungkinkan 0-RTT handshake untuk TLS resumption.`,
       why: `Saat API lo lambat tapi log server menunjukkan execution time cepat, masalahnya ada di network. Apakah itu TCP handshake overhead karena connection pooling tidak jalan? Apakah packet loss menyebabkan TCP backoff? Lo nggak bisa nge-debug ini kalau nggak paham layer 4 (Transport).`,
       mistake: `Mengirim metrics/telemetry data dari app server ke monitoring system (seperti StatsD/Datadog) menggunakan TCP. Jika monitoring server down atau network lambat, TCP akan memblokir app server atau menghabiskan resources untuk retries. Gunakan UDP untuk telemetry — kehilangan beberapa data point lebih baik daripada aplikasi mati.`,
+      content_casual: `Setiap request HTTP berjalan di atas protokol transport (TCP/UDP) dan diawali dengan DNS resolution. Memahami layer ini membedakan engineer biasa dari engineer yang bisa mendebug high-latency issues.
+
+**DNS Resolution:** Sebelum TCP connect, browser harus tahu IP. Alurnya: Browser Cache → OS Cache → Router Cache → ISP Resolver → Root Server → TLD Server → Authoritative Name Server. Di production, DNS resolution time bisa jadi bottleneck. Solusinya: DNS caching, menggunakan GeoDNS/Anycast untuk mengarahkan user ke IP terdekat.
+
+**TCP (Transmission Control Protocol):** Connection-oriented dan reliable. Memiliki jaminan urutan data dan retransmission jika paket hilang. 
+1. **3-Way Handshake:** (SYN, SYN-ACK, ACK). Memakan waktu 1.5 RTT (Round Trip Time) HANYA untuk establish koneksi sebelum data dikirim.
+2. **Congestion Control & Slow Start:** TCP tidak langsung mengirim data pada bandwidth penuh. Ia memulai pelan-pelan (Slow Start) dan perlahan menaikkan window size sampai packet loss terjadi.
+3. **Head-of-Line (HoL) Blocking:** Jika satu paket hilang, TCP akan menghentikan seluruh stream data sampai paket itu dikirim ulang dan diterima.
+
+**UDP (User Datagram Protocol):** Connectionless, tidak ada jaminan sampai (fire and forget), tidak berurutan, tidak ada handshake. Sangat cepat. Digunakan untuk video streaming, gaming, atau statsd/metrics logging.
+
+**HTTP/3 & QUIC:** Berjalan di atas UDP, bukan TCP! QUIC mengimplementasikan reliability di user-space, menghilangkan TCP HoL blocking, dan memungkinkan 0-RTT handshake untuk TLS resumption.`,
+      why_casual: `Saat API lo lambat tapi log server menunjukkan execution time cepat, masalahnya ada di network. Apakah itu TCP handshake overhead karena connection pooling tidak jalan? Apakah packet loss menyebabkan TCP backoff? Lo nggak bisa nge-debug ini kalau nggak paham layer 4 (Transport).`,
+      mistake_casual: `Mengirim metrics/telemetry data dari app server ke monitoring system (seperti StatsD/Datadog) menggunakan TCP. Jika monitoring server down atau network lambat, TCP akan memblokir app server atau menghabiskan resources untuk retries. Gunakan UDP untuk telemetry — kehilangan beberapa data point lebih baik daripada aplikasi mati.`,
       interview: [
         {
           q: 'Apa itu TCP Slow Start dan bagaimana pengaruhnya terhadap performa API?',
@@ -95,6 +115,17 @@ export const pillar2: Pillar = {
 **HTTP Versions:** HTTP/1.1: satu request per koneksi (kecuali pipelining yang jarang digunakan). Browser membuka 6 koneksi TCP paralel per domain. HTTP/2: multiplexing — banyak request/response dalam satu TCP connection, header compression (HPACK). HTTP/3: mengganti TCP dengan QUIC (berbasis UDP). Mengeliminasi head-of-line blocking di transport layer. Lebih bagus untuk jaringan mobile dengan packet loss karena QUIC bisa recovery lebih cepat per-stream.`,
       why: `Pemahaman network stack ini berguna untuk debugging mengapa halaman lambat (bottleneck di DNS? TCP handshake? TTFB?), mengoptimasi response time (preconnect, HTTP/2, CDN), dan merancang API yang resilient (timeout strategy, retry dengan exponential backoff, circuit breaker).`,
       mistake: `Tidak memahami bahwa setiap koneksi TCP baru itu mahal. Membuat koneksi HTTP baru untuk setiap request ke microservice lain (tanpa connection pooling) adalah bottleneck paling umum di backend Node.js. Gunakan http.Agent dengan keepAlive: true, atau undici Pool.`,
+      content_casual: `Ketika user mengetik "https://app.com", serangkaian operasi jaringan terjadi sebelum satu byte HTML terkirim.
+
+**Fase 1 — DNS Resolution:** Browser cek cache lokal. Jika miss, query ke Recursive Resolver (biasanya dari ISP atau 8.8.8.8). Resolver melakukan iterative query: Root Nameserver → TLD Nameserver → Authoritative Nameserver (menyimpan record A: IP address). Result di-cache sesuai TTL. Total: 20-120ms jika uncached.
+
+**Fase 2 — TCP Three-Way Handshake:** Client SYN → Server SYN-ACK → Client ACK. Satu RTT terbuang sebelum satu byte data bisa dikirim. Ini kenapa HTTP persistent connections (Keep-Alive) sangat penting.
+
+**Fase 3 — TLS 1.3 Handshake:** TLS 1.2 membutuhkan 2 RTT. TLS 1.3 dioptimasi menjadi 1 RTT. Bahkan mendukung "0-RTT resumption" — jika client pernah connect sebelumnya, bisa mengirim data langsung di SYN pertama. Proses: client kirim client_hello + key_share. Server pilih cipher, kirim sertifikat + Finished. Client verify sertifikat, kirim Finished. Sesi terenkripsi dimulai.
+
+**HTTP Versions:** HTTP/1.1: satu request per koneksi (kecuali pipelining yang jarang digunakan). Browser membuka 6 koneksi TCP paralel per domain. HTTP/2: multiplexing — banyak request/response dalam satu TCP connection, header compression (HPACK). HTTP/3: mengganti TCP dengan QUIC (berbasis UDP). Mengeliminasi head-of-line blocking di transport layer. Lebih bagus untuk jaringan mobile dengan packet loss karena QUIC bisa recovery lebih cepat per-stream.`,
+      why_casual: `Pemahaman network stack ini berguna untuk debugging mengapa halaman lambat (bottleneck di DNS? TCP handshake? TTFB?), mengoptimasi response time (preconnect, HTTP/2, CDN), dan merancang API yang resilient (timeout strategy, retry dengan exponential backoff, circuit breaker).`,
+      mistake_casual: `Tidak memahami bahwa setiap koneksi TCP baru itu mahal. Membuat koneksi HTTP baru untuk setiap request ke microservice lain (tanpa connection pooling) adalah bottleneck paling umum di backend Node.js. Gunakan http.Agent dengan keepAlive: true, atau undici Pool.`,
       interview: [
         {
           q: 'Jelaskan secara lengkap apa yang terjadi dari user mengetik URL sampai halaman muncul.',
@@ -159,6 +190,17 @@ const res = await fetch(url, {
 **Pagination Strategies:** Offset-based: ?page=3&limit=20. Simple tapi bermasalah untuk dataset besar (OFFSET 1000000 masih scan 1 juta baris di DB). Cursor-based: ?cursor=<opaque_token>&limit=20. Cursor mewakili posisi di dataset. Jauh lebih efisien dan konsisten saat data berubah di tengah pagination.`,
       why: `API adalah kontrak publik antar tim. API yang konsisten mengurangi waktu diskusi dan bug integrasi. API yang tidak konsisten (terkadang return array, terkadang object; status code random; error format berbeda tiap endpoint) membuat tim frontend frustasi dan memperlambat development.`,
       mistake: `Mengembalikan 200 OK untuk error (misalnya { status: "error", message: "..." } dengan HTTP 200) — ini mematikan semua monitoring, alerting, dan circuit breaker yang mengandalkan HTTP status codes. Tidak pernah memikirkan versioning di awal — ketika butuh breaking change, tidak ada jalan mundur jika API digunakan clients eksternal.`,
+      content_casual: `REST bukan protokol atau standar — ia adalah arsitektur style. Di dunia nyata, "RESTful API" sering berarti "HTTP API dengan JSON" yang mengabaikan constraint REST sebenarnya. Memahami prinsip di baliknya membantu mendesain API yang konsisten dan predictable.
+
+**Resource-Oriented Design:** URL harus mewakili resource (benda), bukan action (kata kerja). Salah: /getUserOrders. Benar: /users/{id}/orders. HTTP method menunjukkan action: GET (ambil), POST (buat baru), PUT (replace seluruh resource), PATCH (update sebagian), DELETE (hapus).
+
+**Idempotency:** Sebuah operasi disebut idempotent jika melakukannya berkali-kali menghasilkan hasil yang sama. GET, PUT, DELETE: idempotent. POST: tidak (setiap call bisa membuat resource baru). Untuk POST yang harus idempotent (payment, order): gunakan "Idempotency-Key" header — client mengirim unique key, server menyimpannya dan mengembalikan response yang sama jika key sudah diproses.
+
+**Status Codes yang Tepat:** 200 OK, 201 Created (sertakan Location header), 204 No Content (delete), 400 Bad Request (validasi gagal + detail), 401 Unauthorized (token missing/invalid), 403 Forbidden (ada token tapi tidak ada izin), 404 Not Found, 409 Conflict, 422 Unprocessable Entity, 429 Too Many Requests, 500 Internal Server Error.
+
+**Pagination Strategies:** Offset-based: ?page=3&limit=20. Simple tapi bermasalah untuk dataset besar (OFFSET 1000000 masih scan 1 juta baris di DB). Cursor-based: ?cursor=<opaque_token>&limit=20. Cursor mewakili posisi di dataset. Jauh lebih efisien dan konsisten saat data berubah di tengah pagination.`,
+      why_casual: `API adalah kontrak publik antar tim. API yang konsisten mengurangi waktu diskusi dan bug integrasi. API yang tidak konsisten (terkadang return array, terkadang object; status code random; error format berbeda tiap endpoint) membuat tim frontend frustasi dan memperlambat development.`,
+      mistake_casual: `Mengembalikan 200 OK untuk error (misalnya { status: "error", message: "..." } dengan HTTP 200) — ini mematikan semua monitoring, alerting, dan circuit breaker yang mengandalkan HTTP status codes. Tidak pernah memikirkan versioning di awal — ketika butuh breaking change, tidak ada jalan mundur jika API digunakan clients eksternal.`,
       interview: [
         {
           q: 'Apa itu idempotency dan mengapa ia penting untuk sistem pembayaran?',
@@ -230,6 +272,20 @@ Kapan pakai WebSockets? Chat apps, live sports updates, collaborative editing (G
 Kapan TIDAK pakai WebSockets? Jika lo cuma butuh server → client updates sesekali, gunakan Server-Sent Events (SSE) via HTTP biasa. WebSockets stateful dan jauh lebih susah di-scale (membutuhkan sticky sessions atau Redis Pub/Sub untuk sinkronisasi antar server instances).`,
       why: `Microservices yang saling memanggil via REST/JSON pada high scale akan membuang 30-40% CPU hanya untuk JSON parsing dan string allocation. Pindah ke gRPC sering kali memotong latency internal hingga 5x.`,
       mistake: `Menggunakan WebSockets untuk segala jenis komunikasi "real-time", padahal cuma butuh one-way server push. WebSockets butuh ping/pong keep-alive, susah di-load balance, dan memakan resource file descriptor terus-menerus. Jika data cuma mengalir dari server ke client, Server-Sent Events (SSE) jauh lebih ringan, bisa berjalan di atas HTTP/2, dan gampang di-cache/load-balance.`,
+      content_casual: `REST + JSON sangat bagus untuk public API, tapi untuk internal microservices atau real-time apps, REST memiliki overhead besar.
+
+**Protocol Buffers (Protobufs):** Format serialisasi biner dari Google. Di REST, kita kirim string JSON (raw text, butuh parsing mahal, ukuran besar). Di Protobuf, kita mendefinisikan skema (.proto) dan meng-compile menjadi struct/class di berbagai bahasa. Data dikirim dalam format biner yang sangat padat dan cepat di-parse. 
+
+**gRPC:** Remote Procedure Call framework yang menggunakan HTTP/2 dan Protobuf. Keunggulan:
+1. **Performa:** Payload biner (Protobuf) + HTTP/2 multiplexing (banyak request dalam 1 TCP connection).
+2. **Streaming:** Mendukung Unary (request/response biasa), Client streaming, Server streaming, dan Bidirectional streaming.
+3. **Strongly Typed Contracts:** File .proto menjadi sumber kebenaran (Source of Truth) antar tim. Tidak perlu lagi bingung tipe data apa yang dikirim.
+
+**WebSockets:** Protokol di atas TCP untuk full-duplex, bidirectional communication antara browser dan server. Diawali dengan HTTP Upgrade request, lalu koneksi TCP tetap terbuka.
+Kapan pakai WebSockets? Chat apps, live sports updates, collaborative editing (Google Docs).
+Kapan TIDAK pakai WebSockets? Jika lo cuma butuh server → client updates sesekali, gunakan Server-Sent Events (SSE) via HTTP biasa. WebSockets stateful dan jauh lebih susah di-scale (membutuhkan sticky sessions atau Redis Pub/Sub untuk sinkronisasi antar server instances).`,
+      why_casual: `Microservices yang saling memanggil via REST/JSON pada high scale akan membuang 30-40% CPU hanya untuk JSON parsing dan string allocation. Pindah ke gRPC sering kali memotong latency internal hingga 5x.`,
+      mistake_casual: `Menggunakan WebSockets untuk segala jenis komunikasi "real-time", padahal cuma butuh one-way server push. WebSockets butuh ping/pong keep-alive, susah di-load balance, dan memakan resource file descriptor terus-menerus. Jika data cuma mengalir dari server ke client, Server-Sent Events (SSE) jauh lebih ringan, bisa berjalan di atas HTTP/2, dan gampang di-cache/load-balance.`,
       interview: [
         {
           q: 'Bagaimana cara load balancing koneksi gRPC? Mengapa layer 4 (TCP) load balancer tidak cukup?',
@@ -288,6 +344,17 @@ app.get('/events', (req, res) => {
 **Token Storage:** Jangan simpan token di localStorage (rentan XSS — script manapun bisa mengaksesnya). Simpan access token di memory (JavaScript variable) dan refresh token di httpOnly + Secure + SameSite=Strict cookie. httpOnly mencegah JavaScript mengakses cookie, melindungi dari XSS. SameSite=Strict mencegah CSRF.`,
       why: `Auth yang salah implementasi adalah penyebab paling umum data breach. OWASP Top 10 selalu memasukkan "Broken Authentication" dan "Broken Access Control". Memahami mekanisme di balik JWT dan OAuth memungkinkan mendesain sistem yang aman by default.`,
       mistake: `Menyimpan JWT di localStorage. Membuat access token dengan expiry 30 hari. Tidak memvalidasi 'aud' (audience) claim di JWT — token untuk service A bisa digunakan di service B. Tidak melakukan rate limiting pada endpoint login. Menyimpan password sebagai plain text atau MD5/SHA1 — gunakan bcrypt, argon2, atau scrypt.`,
+      content_casual: `Authentication (AuthN) menjawab "siapa kamu?" Authorization (AuthZ) menjawab "kamu boleh ngapain?". Keduanya adalah domain terpisah dengan mekanisme berbeda.
+
+**JWT (JSON Web Token):** Terdiri dari tiga bagian Base64URL-encoded dipisahkan titik: Header (algorithm: "HS256" atau "RS256"), Payload (claims: sub, iat, exp, role, custom data), Signature. Signature dibuat dengan men-sign Header.Payload menggunakan secret key. Siapapun yang punya public key bisa verify token tanpa menghubungi authorization server — ini yang membuat JWT "stateless". Trade-off besar: JWT tidak bisa di-revoke sebelum expired. Solusi: access token berumur pendek (5-15 menit) + refresh token berumur panjang yang disimpan di database.
+
+**OAuth2:** Protokol untuk memberikan akses terbatas ke resource user di service lain tanpa berbagi password. Authorization Code Flow (web apps — paling aman). PKCE (untuk SPA dan mobile tanpa client secret). Client Credentials (machine-to-machine). OIDC (OpenID Connect) adalah lapisan identity di atas OAuth2 — "Login with Google".
+
+**RBAC (Role-Based Access Control):** Assign permissions ke roles, lalu assign roles ke users. User bisa punya multiple roles. Lebih scalable dari per-user permissions. Untuk sistem kompleks, gunakan policy engine seperti OPA (Open Policy Agent).
+
+**Token Storage:** Jangan simpan token di localStorage (rentan XSS — script manapun bisa mengaksesnya). Simpan access token di memory (JavaScript variable) dan refresh token di httpOnly + Secure + SameSite=Strict cookie. httpOnly mencegah JavaScript mengakses cookie, melindungi dari XSS. SameSite=Strict mencegah CSRF.`,
+      why_casual: `Auth yang salah implementasi adalah penyebab paling umum data breach. OWASP Top 10 selalu memasukkan "Broken Authentication" dan "Broken Access Control". Memahami mekanisme di balik JWT dan OAuth memungkinkan mendesain sistem yang aman by default.`,
+      mistake_casual: `Menyimpan JWT di localStorage. Membuat access token dengan expiry 30 hari. Tidak memvalidasi 'aud' (audience) claim di JWT — token untuk service A bisa digunakan di service B. Tidak melakukan rate limiting pada endpoint login. Menyimpan password sebagai plain text atau MD5/SHA1 — gunakan bcrypt, argon2, atau scrypt.`,
       interview: [
         {
           q: 'Mengapa refresh token pattern digunakan daripada satu long-lived access token?',
@@ -381,6 +448,22 @@ router.delete('/users/:id', authenticate, authorize('admin'), deleteUser)`
 - **Sliding Window:** Kombinasi yang lebih smooth, melihat rata-rata req di jendela waktu bergerak.`,
       why: `Satu celah keamanan bisa menghancurkan reputasi perusahaan yang dibangun bertahun-tahun. Security bukan sekadar "tugas tim InfoSec", melainkan tanggung jawab arsitektural engineer dari awal mendesain API.`,
       mistake: `Menyimpan JWT Token di localStorage. Local storage BISA diakses oleh script apapun di domain lo (rentan XSS). Jika ada XSS, token lo langsung dicuri. Best practice: simpan JWT di httpOnly cookie. Cookie httpOnly TIDAK BISA dibaca oleh JavaScript (kebal pencurian via XSS), dan gunakan attribut Secure + SameSite untuk melindunginya dari CSRF.`,
+      content_casual: `Sistem yang scalable tidak berguna kalau bisa dibobol dalam 5 menit. Senior engineer wajib memahami top attack vectors (OWASP) dan cara memitigasinya di level arsitektur.
+
+**XSS (Cross-Site Scripting):** Attacker menyuntikkan script JS berbahaya ke halaman web user lain. Mitigasi: Jangan pernah percaya user input. Gunakan framework modern (React/Vue otomatis escape HTML variables), sanitasi HTML menggunakan library seperti DOMPurify jika menerima input rich-text, dan terapkan Content Security Policy (CSP) header untuk membatasi domain eksekusi script.
+
+**CSRF (Cross-Site Request Forgery):** Attacker menipu browser user untuk mengirim request ke situs lo saat user masih login (misal via hidden form auto-submit di web attacker). Mitigasi: 
+1. Gunakan SameSite=Lax atau Strict pada cookie session.
+2. Gunakan CSRF Token (Anti-Forgery Token) yang digenerate server dan harus dikirim bersama form POST.
+
+**JWT Vulnerabilities:** JWT bukan sihir. Isinya cuma Base64, BISA dibaca siapa saja, JANGAN simpan data sensitif di payload. Masalah umum: algoritma 'none' diterima server, membocorkan secret key, atau JWT tidak bisa di-revoke (karena stateless). Mitigasi revocation: simpan JWT JTI (ID) di Redis blocklist, atau gunakan token umur sangat pendek (15 menit) + Refresh Token.
+
+**Rate Limiting & Throttling:** Mencegah brute-force dan DDoS ringan. Algoritma populer:
+- **Token Bucket:** Setiap user punya 'ember' token yang terisi seiring waktu. Request pakai token. (Cocok untuk burst traffic).
+- **Fixed Window:** Max 100 req per menit per IP, reset di menit baru. (Masalah: burst 200 req di detik perpindahan menit).
+- **Sliding Window:** Kombinasi yang lebih smooth, melihat rata-rata req di jendela waktu bergerak.`,
+      why_casual: `Satu celah keamanan bisa menghancurkan reputasi perusahaan yang dibangun bertahun-tahun. Security bukan sekadar "tugas tim InfoSec", melainkan tanggung jawab arsitektural engineer dari awal mendesain API.`,
+      mistake_casual: `Menyimpan JWT Token di localStorage. Local storage BISA diakses oleh script apapun di domain lo (rentan XSS). Jika ada XSS, token lo langsung dicuri. Best practice: simpan JWT di httpOnly cookie. Cookie httpOnly TIDAK BISA dibaca oleh JavaScript (kebal pencurian via XSS), dan gunakan attribut Secure + SameSite untuk melindunginya dari CSRF.`,
       interview: [
         {
           q: 'Bagaimana cara kerjanya cookie httpOnly dan apa kaitannya dengan XSS vs CSRF?',

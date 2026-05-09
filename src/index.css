@@ -243,6 +243,16 @@ h1, h2, h3, h4, h5, h6,
 .card-progress .progress-track{flex:1;background:var(--border);height:5px}
 .card-progress small{font-size:.72rem;color:var(--text-3);font-weight:600;min-width:2.5rem;text-align:right}
 
+/* ─── TOPIC LIST CARD (PILLAR VIEW) ─── */
+.topic-list-card{background:var(--surface-dim);border:1px solid var(--border-2);border-radius:14px;padding:1.4rem 1.75rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .2s cubic-bezier(.16,1,.3,1)}
+.topic-list-card:hover{background:var(--surface);border-color:var(--accent-border);box-shadow:0 8px 24px rgba(0,0,0,.15);transform:translateY(-2px)}
+.topic-list-card.done{background:var(--green-dim);border-color:var(--green)}
+.topic-list-card h3{margin:0 0 .35rem 0;font-size:1.15rem;font-weight:700;color:var(--text)}
+.topic-list-card p{margin:0;font-size:.9rem;color:var(--text-3)}
+.topic-list-card .icon-status{color:var(--border-2);transition:color .2s;display:flex;align-items:center}
+.topic-list-card.done .icon-status{color:var(--green)}
+.topic-list-card:hover:not(.done) .icon-status{color:var(--accent)}
+
 /* ─── SCROLL TO TOP ─── */
 .scroll-top{position:fixed;bottom:2rem;right:2rem;width:42px;height:42px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(10px);pointer-events:none;transition:all .25s ease;z-index:30;backdrop-filter:blur(8px)}
 .scroll-top.visible{opacity:1;transform:translateY(0);pointer-events:auto}
