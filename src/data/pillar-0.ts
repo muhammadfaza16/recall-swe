@@ -5,6 +5,36 @@ export const pillar0: Pillar = {
   title: 'Pillar 0 — Prerequisites',
   topics: [
     {
+      id: 'computer-architecture-101',
+      title: 'Computer Architecture 101',
+      depth: 'Bits, Bytes, CPU Cache, and Memory Hierarchy',
+      content: 'Sebelum kita bicara optimasi kode, kita harus tahu di mana kode berjalan.\n\n**Bits & Bytes:** Komputer hanya mengerti 0 dan 1 (binary). 1 byte = 8 bits. Semua tipe data (integer, string, boolean) pada akhirnya dikodekan menjadi representasi binary ini.\n\n**CPU & Registers:** CPU mengeksekusi instruksi. Data yang sedang aktif dikerjakan disimpan di *Registers* (sangat cepat, tapi sangat kecil). Jika tidak cukup, data diambil dari cache atau RAM.\n\n**Memory Hierarchy:** Ini adalah rahasia performa tinggi. CPU memiliki L1, L2, dan L3 Cache. Akses L1 Cache butuh ~1 nanosecond. Akses RAM (Main Memory) butuh ~100 nanoseconds (100x lebih lambat!). Jika data tidak ada di RAM, sistem akan mengambil dari SSD/Hard Disk (bisa ribuan kali lebih lambat dari RAM).\n\n**Spatial Locality:** CPU tidak mengambil data per *byte* dari RAM, melainkan dalam bentuk *Cache Line* (biasanya 64 bytes). Jika Anda mengakses elemen array secara berurutan, elemen berikutnya kemungkinan besar sudah terbawa ke dalam *Cache Line* (sangat cepat). Inilah mengapa *Array* jauh lebih cepat di-iterasi daripada *Linked List* yang alamat memorinya melompat-lompat.',
+      why: 'Tanpa pemahaman dasar arsitektur, optimasi kode terasa seperti sihir. Software engineer level FAANG tahu bahwa struktur data yang ramah terhadap CPU Cache (seperti array/slice) seringkali mengalahkan struktur data algoritmik kompleks yang alamat memorinya berantakan (seperti tree atau linked list) pada jumlah data kecil-menengah.',
+      mistake: 'Berpikir bahwa O(1) selalu instan dan O(n) lambat di dunia nyata. Hash Map memiliki kompleksitas O(1), tapi operasi *hashing* dan memori yang tersebar membuat konstanta waktunya besar. Kadang iterasi O(n) pada Array kecil jauh lebih cepat karena L1 Cache.',
+      interview: [
+        {
+          q: 'Jelaskan mengapa iterasi pada Array lebih cepat daripada iterasi pada Linked List meskipun keduanya memiliki kompleksitas waktu O(n)?',
+          a: 'Kuncinya ada pada CPU Cache dan Spatial Locality. Array menyimpan datanya secara contiguous (berdampingan) di memori. Ketika CPU meminta elemen pertama, ia memuat seluruh "Cache Line" (misal 64 bytes) dari RAM ke L1 Cache. Elemen kedua, ketiga, dan seterusnya sudah berada di cache (akses ~1ns). Sebaliknya, node pada Linked List tersebar di berbagai lokasi memori. CPU harus terus-menerus mengambil dari RAM (akses ~100ns) yang mengakibatkan fenomena "Cache Miss".'
+        }
+      ],
+      code: '// Simulasi Locality (Mental Model)\n// Array: Alamat memori berurutan (0x00, 0x04, 0x08)\nconst arr = [1, 2, 3, 4]\n\n// Linked List: Alamat memori melompat (0x1A, 0x9F, 0x2C)\nconst node1 = { val: 1, next: node2 }\nconst node2 = { val: 2, next: null }'
+    },
+    {
+      id: 'programming-paradigms',
+      title: 'OOP & Functional Programming 101',
+      depth: 'State, Behavior, Immutability, and Pure Functions',
+      content: 'Paradigma pemrograman adalah cara kita menstrukturkan pikiran untuk memecahkan masalah. Dua pilar utama di industri adalah OOP dan FP.\n\n**Object-Oriented Programming (OOP):** Menggabungkan *State* (data) dan *Behavior* (fungsi) ke dalam satu entitas yang disebut Object. 4 Prinsip utamanya:\n1. **Encapsulation:** Menyembunyikan *state* internal dan hanya mengekspos *method* publik.\n2. **Abstraction:** Menyembunyikan kerumitan implementasi dari pengguna class.\n3. **Inheritance:** Mewariskan properti dan method dari parent ke child.\n4. **Polymorphism:** Method yang sama bisa memiliki implementasi berbeda tergantung object-nya.\n\n**Functional Programming (FP):** Memisahkan data dan fungsi. Ciri utamanya:\n1. **Pure Functions:** Output hanya bergantung pada input. Tidak ada *side-effects* (tidak mengubah variabel global atau menulis ke DB).\n2. **Immutability:** Data tidak pernah diubah setelah dibuat. Jika ingin mengubah array, buat array baru hasil *copy* (contoh: `map`, `filter`).\n3. **First-class Functions:** Fungsi diperlakukan sebagai variabel, bisa di-*pass* sebagai argumen.',
+      why: 'Semua arsitektur modern adalah kombinasi paradigma ini. React menggunakan prinsip FP (Immutability, Pure Components) agar UI *predictable*. Sementara backend Java/C# sangat kental dengan OOP untuk mengelola dependensi kompleks. Paham keduanya berarti Anda punya dua alat untuk masalah yang berbeda.',
+      mistake: 'Mengubah *state* secara langsung (mutating state) di aplikasi yang dibangun dengan prinsip FP (seperti Redux/React), yang menyebabkan UI tidak re-render. Di sisi OOP: Terlalu banyak membuat hierarki *Inheritance* yang dalam (God Object), padahal *Composition* seringkali lebih baik.',
+      interview: [
+        {
+          q: 'Apa bedanya Pure Function dan Impure Function?',
+          a: 'Pure function selalu mengembalikan output yang sama untuk input yang sama, dan TIDAK memiliki side effects (tidak memodifikasi variabel luar, tidak menulis ke disk, tidak menembak API). Impure function hasilnya bisa berubah walau inputnya sama (misal memanggil Math.random() atau Date.now()) atau melakukan side-effect (seperti console.log atau UPDATE ke database). Pure function sangat mudah di-test karena tidak butuh mocking.'
+        }
+      ],
+      code: '// OOP Example (Encapsulation & State)\nclass BankAccount {\n  private balance = 0; // Encapsulated\n  deposit(amount: number) { this.balance += amount; } // Mutates state\n  getBalance() { return this.balance; }\n}\n\n// FP Example (Immutability & Pure Function)\ntype Account = { balance: number };\nfunction deposit(acc: Account, amount: number): Account {\n  return { ...acc, balance: acc.balance + amount }; // Returns NEW object\n}'
+    },
+    {
       id: 'big-o',
       title: 'Big O & Data Structures',
       depth: 'The language of algorithmic performance',

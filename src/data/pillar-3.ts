@@ -5,6 +5,36 @@ export const pillar3: Pillar = {
   title: 'Pillar 3 — Data & Databases',
   topics: [
     {
+      id: 'db-design-101',
+      title: 'Database Design & Normalization 101',
+      depth: 'ERD, 1NF/2NF/3NF, and The N+1 Problem',
+      content: 'Sebelum melakukan query rumit, struktur databasenya harus benar dulu.\n\n**Relational Basics & ERD:** Database relasional direpresentasikan dalam tabel (baris dan kolom). Hubungan antar tabel digambarkan dalam ERD (Entity Relationship Diagram). Ada 1:1, 1:N (Satu User punya banyak Order), dan M:N (Satu User punya banyak Role, satu Role dimiliki banyak User — butuh tabel penengah/junction table).\n\n**Database Normalization:** Proses mereduksi duplikasi data.\n- **1NF:** Setiap kolom hanya boleh berisi satu nilai atomik (jangan simpan array string di dalam teks).\n- **2NF:** Sudah 1NF, dan semua kolom non-kunci sepenuhnya bergantung pada Primary Key utuh (tidak pada sebagian Composite Key).\n- **3NF:** Sudah 2NF, dan tidak ada ketergantungan transitif (Kolom A bergantung ke Kolom B, dan B bergantung ke Primary Key. Pisahkan B jadi tabel baru!).\n\n**ORM & The N+1 Problem:** Object-Relational Mapping (Prisma, TypeORM, Hibernate) memetakan row di DB menjadi Object di kode. Bahayanya adalah N+1 Problem: Jika Anda mengambil 10 User (1 query), lalu me-loop 10 User tersebut dan memanggil `user.getOrders()` di setiap iterasi, ORM akan melakukan 10 query tambahan ke DB. Total 11 query! Solusinya adalah *Eager Loading* (`JOIN` di awal).',
+      why: 'Desain DB yang salah di awal akan menjadi technical debt permanen yang membunuh performa 2 tahun kemudian. Pemahaman Normalization mencegah data anomali (update satu nama orang di tabel A, tapi di tabel B namanya masih lama).',
+      mistake: 'Terlalu patuh pada 3NF. Di skala besar (Enterprise), operasi JOIN yang terlalu banyak sangat memberatkan CPU database. Arsitek sering melakukan *Denormalization* secara sengaja — menyimpan sedikit data duplikat agar proses baca (SELECT) lebih cepat tanpa JOIN.',
+      interview: [
+        {
+          q: 'Apa itu N+1 Query Problem dan bagaimana cara menghindarinya?',
+          a: 'N+1 terjadi saat menggunakan ORM: aplikasi melakukan 1 query awal untuk mendapatkan N buah record (misal 50 users). Lalu kode melakukan iterasi (loop) pada 50 users tersebut dan memanggil relasinya (user.orders). ORM akan menembak DB 50 kali untuk mengambil orders tiap user. Total 51 query. Solusinya: gunakan Eager Loading (misal di Prisma: include: { orders: true }). ORM akan mengubahnya menjadi 1 query JOIN besar atau 2 query (satu ambil users, satu ambil orders WHERE userId IN (...)) yang jauh lebih efisien.'
+        }
+      ],
+      code: '// THE N+1 PROBLEM (Anti-pattern)\nconst users = await db.user.findMany() // 1 Query\nfor (const u of users) {\n  // 💥 FIRE N QUERIES!\n  const orders = await db.order.find({ userId: u.id })\n}\n\n// SOLUTION: Eager Loading\nconst usersWithOrders = await db.user.findMany({\n  include: { orders: true } // 1 Query total (JOIN or IN)\n})'
+    },
+    {
+      id: 'sql-vs-nosql-101',
+      title: 'SQL vs NoSQL Paradigms',
+      depth: 'Relational vs Document vs Key-Value',
+      content: 'Database bukan *one-size-fits-all*. Memilih jenis database adalah keputusan arsitektural paling krusial.\n\n**SQL / Relational (PostgreSQL, MySQL):**\nSkema kaku (strict schema). Cocok untuk data yang strukturnya jelas, jarang berubah formatnya, dan mengutamakan **Konsistensi** (ACID compliant). Hubungan antar data (Relasi) sangat kuat melalui Foreign Keys dan operasi JOIN. *Use case: Sistem keuangan, ERP, Inventory.*\n\n**NoSQL - Document Store (MongoDB):**\nSkema dinamis (schema-less). Data disimpan dalam bentuk mirip JSON (BSON). Sangat fleksibel, kolom baru bisa ditambahkan ke satu row tanpa mengubah struktur row lain. Lemah di operasi JOIN (disarankan data di-embed/denormalisasi). *Use case: CMS, Catalog e-commerce, Aplikasi dengan fitur yang cepat berubah.*\n\n**NoSQL - Key-Value (Redis, DynamoDB):**\nHanya menyimpan pasangan Kunci dan Nilai. Sangat cepat (biasanya di memori), tapi tidak bisa di-query dengan kompleks (tidak bisa "Ambil nilai di mana harga > 100"). *Use case: Caching, User Session, Rate Limiting.*',
+      why: 'Memakai MongoDB hanya karena "tidak perlu repot bikin migrasi schema" adalah resep bencana. Jika relasi antar entitas Anda tinggi, dokumen MongoDB akan membengkak, dan memanipulasi relasinya secara manual di kode aplikasi jauh lebih lambat daripada operasi JOIN di PostgreSQL.',
+      mistake: 'Menggunakan Database Relasional (SQL) untuk menyimpan data log (seperti log aktivitas klik user yang mencapai jutaan per hari). Operasi INSERT di SQL cukup mahal karena harus update index dan menjaga integritas constraint. Untuk log, gunakan database Time-Series (Prometheus) atau NoSQL Document/Wide-Column (Cassandra).',
+      interview: [
+        {
+          q: 'Kapan Anda akan memilih MongoDB dibandingkan PostgreSQL untuk proyek baru?',
+          a: 'Gunakan PostgreSQL jika struktur data sudah jelas, ada banyak entitas yang berelasi (User, Product, Order, Invoice), dan kita mengandalkan ACID compliance untuk transaksi uang/inventory. Gunakan MongoDB jika skema data belum jelas/akan sering berubah (rapid prototyping), datanya bersifat hirarkis (satu dokumen memiliki banyak sub-dokumen yang tidak perlu di-share ke dokumen lain), atau jika kita butuh skalabilitas horizontal yang masif sejak awal tanpa perlu repot dengan Sharding SQL.'
+        }
+      ],
+      code: '// SQL Mental Model (Tables & Rows)\n// TABLE Users: id, name | TABLE Orders: id, user_id, amount\n// Needs JOIN to combine.\n\n// MongoDB Mental Model (Document)\n{\n  "_id": "usr_123",\n  "name": "Alice",\n  "orders": [             // Embedded Array (No JOIN needed)\n    { "id": "ord_1", "amount": 100 }\n  ]\n}'
+    },
+    {
       id: 'sql-mastery',
       title: 'SQL Mastery & Query Optimization',
       depth: 'JOINs, Window Functions, EXPLAIN ANALYZE',

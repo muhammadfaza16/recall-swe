@@ -5,6 +5,36 @@ export const pillar7: Pillar = {
   title: 'Pillar 7 — DevOps & System Design',
   topics: [
     {
+      id: 'linux-shell-101',
+      title: 'Linux OS & Shell Fundamentals',
+      depth: 'Permissions, Piping, and SSH',
+      content: 'Cloud 99% berjalan di atas Linux. Berkomunikasi dengan Linux melalui terminal/Shell adalah nafas DevOps.\n\n**File Permissions (Chmod/Chown):** Setiap file di Linux memiliki pemilik (User), grup (Group), dan orang lain (Others). Masing-masing memiliki hak akses Read (4), Write (2), dan Execute (1). Perintah `chmod 755` artinya: User (4+2+1=7 = rwx), Group (4+1=5 = r-x), Others (5 = r-x).\n\n**Piping & Redirection (| & >):** Kekuatan sejati UNIX adalah program-program kecil yang bisa dirangkai. Pipe (`|`) mengambil output dari satu program dan menjadikannya input untuk program lain. Contoh: `cat server.log | grep "ERROR" | wc -l` (Baca log -> cari yang mengandung "ERROR" -> hitung jumlah barisnya).\n\n**SSH (Secure Shell):** Cara kita meremote server secara aman. SSH menggunakan kunci asimetris. Anda meletakkan *Public Key* di server (di file `~/.ssh/authorized_keys`), lalu menghubunginya menggunakan *Private Key* rahasia Anda. Tidak butuh password rentan!',
+      why: 'GUI tidak tersedia di server produksi. Saat server down karena disk space penuh, Anda harus masuk via SSH, menjalankan `df -h`, `du -sh`, dan mematikan proses menggunakan `kill -9`. Kemampuan shell membedakan engineer ops dari awam.',
+      mistake: 'Menjalankan semua operasi di server production sebagai `root`. Root memiliki akses tak terbatas; kesalahan ketik `rm -rf / ` akan menghapus seluruh sistem operasi. Selalu gunakan user biasa, dan tambahkan `sudo` di depan perintah hanya untuk perintah yang butuh elevasi hak.',
+      interview: [
+        {
+          q: `Jelaskan apa yang terjadi ketika Anda mengetikkan "cat access.log | grep 404 | awk '{print $1}' | sort | uniq -c" ?`,
+          a: 'Itu adalah pipeline log analysis klasik UNIX. (1) cat membaca seluruh file log. (2) grep menyaring baris yang hanya mengandung "404". (3) awk mengekstrak kolom ke-1 (biasanya IP Address). (4) sort mengurutkan IP address tersebut agar yang sama berdekatan. (5) uniq -c menghitung frekuensi duplikasi berurutan. Hasil akhirnya adalah laporan berupa daftar IP address mana saja yang paling banyak mendapatkan error 404.'
+        }
+      ],
+      code: '# LINUX SURVIVAL GUIDE\n\n# 1. SSH into server\nssh -i ~/.ssh/my_key.pem ubuntu@192.168.1.1\n\n# 2. Check disk space\ndf -h\n\n# 3. Check what ports are listening\nnetstat -tulpn  # or ss -tulwn\n\n# 4. Check active processes sorting by CPU\ntop   # (or htop)\n\n# 5. Find a huge file killing your disk\nfind /var/log -type f -size +500M\n\n# 6. View streaming logs (tail)\ntail -f /var/log/syslog | grep "nginx"'
+    },
+    {
+      id: 'cicd-101',
+      title: 'CI/CD Fundamentals',
+      depth: 'Continuous Integration vs Deployment',
+      content: 'Mengunggah kode secara manual via FTP atau SCP ke server setiap rilis adalah resep untuk insiden. CI/CD adalah otomatisasi proses tersebut.\n\n**Continuous Integration (CI):** Setiap kali developer men-push kode (atau membuat Pull Request), sebuah server otomatis mengambil kode tersebut, mengkompilasinya (build), dan menjalankan SEMUA Unit Test/Linter. Tujuan CI: Memastikan kode yang di-merge tidak merusak aplikasi (broken build).\n\n**Continuous Deployment/Delivery (CD):** Setelah CI hijau (sukses), artefak yang sudah di-build (contoh: Docker Image) secara otomatis disalin dan di-restart di server production. CD menghilangkan unsur manusia (error-prone) dari proses rilis.\n\n**Infrastructure as Code (IaC):** Server dan pipeline bukan lagi "klik-klik manual di AWS Console". Konfigurasi CI/CD disimpan sebagai file YAML (misal `.github/workflows/main.yml`) dan di-commit ke repositori. Server Cloud di-deploy melalui Terraform. Semua terekam di Git.',
+      why: 'Di perusahaan teknologi modern (termasuk FAANG), developer bisa merilis fitur ke jutaan user hanya dengan meng-klik tombol "Merge PR". Pipeline yang kuat memastikan kecepatan rilis tanpa kompromi pada kualitas.',
+      mistake: 'Menyatukan environment *testing* dengan konfigurasi *production* di dalam CI. Anda mungkin tanpa sengaja men-test operasi `DELETE` yang mengenai database production saat pipeline berjalan di GitHub Actions.',
+      interview: [
+        {
+          q: 'Apa perbedaan antara Continuous Delivery dan Continuous Deployment?',
+          a: 'Keduanya berbagi bagian "Continuous Integration" (Build + Test otomatis). Bedanya ada di langkah rilis. Dalam Continuous Delivery, setelah kode siap rilis, proses deploy ke production masih membutuhkan satu klik manual dari manusia (Approval). Dalam Continuous Deployment, jika seluruh test otomatis lulus, kode tersebut LANGSUNG naik ke production secara otomatis tanpa intervensi manusia sama sekali.'
+        }
+      ],
+      code: '# MENTAL MODEL: GITHUB ACTIONS PIPELINE (.github/workflows/deploy.yml)\nname: CI/CD Pipeline\n\non:\n  push:\n    branches: [ "main" ]\n\njobs:\n  build_and_test:    # THE CI PART\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - name: Install dependencies\n        run: npm ci\n      - name: Run Unit Tests\n        run: npm test\n\n  deploy:            # THE CD PART\n    needs: build_and_test  # Only runs if tests pass!\n    runs-on: ubuntu-latest\n    steps:\n      - name: Deploy to Server\n        run: ./deploy.sh production'
+    },
+    {
       id: 'docker-containers',
       title: 'Containers & Docker Internals',
       depth: 'Namespaces, cgroups, image layers, multi-stage builds',

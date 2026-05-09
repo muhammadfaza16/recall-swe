@@ -5,6 +5,36 @@ export const pillar4: Pillar = {
   title: 'Pillar 4 — Frontend Architecture',
   topics: [
     {
+      id: 'dom-bom-101',
+      title: 'DOM & Event Mechanics 101',
+      depth: 'The Document Object Model and Event Bubbling',
+      content: 'Framework JavaScript seperti React menyembunyikan kompleksitas dari kita. Tapi engineer hebat tahu apa yang terjadi di balik layar.\n\n**DOM & BOM:** Saat HTML diterima browser, ia di-parsing menjadi struktur pohon: DOM (Document Object Model). Setiap elemen HTML menjadi Node. BOM (Browser Object Model) adalah objek global `window` yang memberi akses ke API browser (Local Storage, Geolocation, History).\n\n**Event Bubbling vs Capturing:** Jika Anda meng-klik sebuah tombol di dalam <div>, siapa yang tahu duluan? Browser menggunakan dua fase: *Capturing* (dari parent paling atas turun ke tombol) dan *Bubbling* (dari tombol naik kembali ke parent teratas). Secara default, event listener aktif di fase Bubbling. Ini yang memungkinkan **Event Delegation**.\n\n**Event Delegation:** Alih-alih memasang 100 event listener pada 100 baris tabel, pasang SATU event listener di <ul> atau <table> parent-nya. Saat baris diklik, event akan *bubble up* ke parent, dan parent mengecek `event.target` untuk melihat baris mana yang diklik. Menghemat memori drastis!',
+      why: 'React menggunakan Synthetic Events dan Event Delegation secara internal (React 17+ memasangnya di Root Node). Memahami ini akan menjelaskan mengapa `e.stopPropagation()` kadang berperilaku aneh jika digabung dengan Vanilla JS event listeners di project React yang sama.',
+      mistake: 'Selalu menggunakan `document.getElementById` atau DOM mutator secara manual bersamaan dengan framework deklaratif seperti React. Framework menggunakan Virtual DOM; jika Anda memodifikasi Real DOM langsung (tanpa `ref`), state framework dan DOM akan tidak sinkron dan menyebabkan UI crash.',
+      interview: [
+        {
+          q: 'Apa itu Event Delegation dan mengapa ia sangat berguna?',
+          a: 'Event delegation adalah teknik mendelegasikan penanganan event ke elemen induk, alih-alih memasang listener pada masing-masing anak. Karena mekanisme Event Bubbling, klik pada elemen anak akan merambat naik ke induk. Ini berguna karena: (1) Jauh lebih hemat memori (1 listener vs 1000 listener). (2) Elemen anak yang ditambahkan secara dinamis (via AJAX/DOM manipulation) otomatis bisa langsung merespon event tanpa perlu di-bind listener baru.'
+        }
+      ],
+      code: '// EVENT DELEGATION IN VANILLA JS\nconst ul = document.getElementById("my-list");\n\n// Only 1 listener instead of 100!\nul.addEventListener("click", (e) => {\n  // Check if the clicked target is an LI element\n  if (e.target && e.target.nodeName === "LI") {\n    console.log("List item clicked:", e.target.innerText);\n  }\n});'
+    },
+    {
+      id: 'state-management-101',
+      title: 'State Management Concepts',
+      depth: 'MVC vs Flux and Unidirectional Data Flow',
+      content: 'Kompleksitas utama di Frontend bukanlah tampilan UI, melainkan mengelola State (Data) agar selalu sinkron dengan UI.\n\n**MVC (Model-View-Controller) Klasik di Frontend:** State dikelola di Model, UI di View. Saat Model berubah, View di-update. Dulu (seperti di AngularJS/Backbone), ini bisa menghasilkan *Two-Way Data Binding* (View mengubah Model, Model mengubah View lain). Di aplikasi besar, ini menciptakan efek domino (*cascading updates*) yang sangat sulit di-debug.\n\n**Unidirectional Data Flow (Flux/Redux):** Konsep ini dipopulerkan oleh React. Data hanya mengalir SATU ARAH. View memicu *Action*, Action dikirim ke *Dispatcher/Reducer*, Reducer memperbarui *Store* (State sentral), dan Store merender ulang View. View tidak pernah mengubah State secara langsung.\n\n**Modern Evolution (Signals):** Pendekatan Redux mengharuskan re-render komponen secara Top-Down. Tren terbaru (SolidJS, Preact Signals, Vue 3) menggunakan *Fine-Grained Reactivity*. State dibungkus sebagai "Signal". Saat Signal berubah, ia tahu persis elemen DOM mana yang bergantung padanya dan hanya meng-update elemen DOM kecil tersebut, tanpa VDOM diffing.',
+      why: 'Anda tidak akan paham mengapa Redux sangat *boilerplate-heavy* jika tidak pernah merasakan kacaunya debugging Two-Way Data Binding di jQuery/AngularJS. Memahami alur data ini membedakan Coder dengan Architect.',
+      mistake: 'Menyimpan state yang diturunkan (derived state) di dalam variabel state utama. Jika *fullName* bisa didapatkan dari *firstName* + *lastName*, JANGAN simpan *fullName* di State. Hitung saja secara on-the-fly saat render. Menyimpan derived state akan memicu bug inkonsistensi saat salah satu nama berubah.',
+      interview: [
+        {
+          q: 'Apa masalah utama dari Two-Way Data Binding di aplikasi skala besar dan bagaimana Unidirectional Data Flow menyelesaikannya?',
+          a: 'Two-way binding membuat pelacakan mutasi state sangat sulit. Jika View A mengubah Model 1, Model 1 mengubah View B, View B mengubah Model 2, satu aksi user memicu reaksi berantai yang tidak bisa diprediksi. Unidirectional Data Flow (seperti Flux) menyelesaikannya dengan membuat state mutation menjadi proses tersentralisasi dan satu arah. View hanya mendispatch Action (maksud). Reducer/Store yang memproses state. Ini membuat mutation menjadi transparan, predictable, dan mudah di-time-travel debugging.'
+        }
+      ],
+      code: '// UNIDIRECTIONAL MENTAL MODEL (Redux-style)\n// 1. STATE (Single Source of Truth)\nlet state = { count: 0 }\n\n// 2. VIEW (Driven completely by state)\nconst render = () => console.log("UI updated:", state.count)\n\n// 3. ACTION (The intent to change)\nconst action = { type: "INCREMENT" }\n\n// 4. REDUCER (Pure function handling state change)\nfunction reducer(prevState, action) {\n  if (action.type === "INCREMENT") return { count: prevState.count + 1 }\n  return prevState\n}\n\n// 5. DISPATCH (View cannot mutate state directly!)\nstate = reducer(state, action)\nrender()'
+    },
+    {
       id: 'browser-rendering',
       title: 'Browser Rendering Pipeline',
       depth: 'CRP, Reflow, Repaint, GPU Compositing',

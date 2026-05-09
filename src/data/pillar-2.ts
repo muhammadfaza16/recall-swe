@@ -5,6 +5,36 @@ export const pillar2: Pillar = {
   title: 'Pillar 2 — Networking & Web',
   topics: [
     {
+      id: 'osi-model-101',
+      title: 'The OSI Model 101',
+      depth: 'Layers 1 to 7 and how data actually travels',
+      content: 'OSI (Open Systems Interconnection) Model adalah kerangka konseptual 7 lapis tentang bagaimana sistem jaringan berkomunikasi. Ini mental model wajib untuk networking.\n\n**Layer 1 (Physical):** Kabel fisik, fiber optik, sinyal WiFi (Bit: 1 dan 0).\n**Layer 2 (Data Link):** Komunikasi antar *node* yang berdekatan di jaringan yang sama menggunakan MAC Address (Switch). Unit: Frame.\n**Layer 3 (Network):** Routing data melintasi berbagai jaringan di seluruh dunia menggunakan IP Address (Router). Unit: Packet.\n**Layer 4 (Transport):** Memastikan data sampai ke port aplikasi yang benar. Di sinilah **TCP** (andal, berurutan) dan **UDP** (cepat, fire-and-forget) beroperasi. Unit: Segment.\n**Layer 5 (Session) & 6 (Presentation):** Menjaga sesi komunikasi dan format data (enkripsi SSL/TLS sering dianggap di sini atau antara L4/L7).\n**Layer 7 (Application):** Aplikasi itu sendiri. Di sinilah **HTTP, gRPC, WebSocket, SMTP** beroperasi.\n\n**L4 vs L7 Load Balancer:** L4 LB (seperti AWS NLB) hanya melihat IP dan Port (sangat cepat, buta terhadap isi data). L7 LB (seperti AWS ALB atau Nginx) bisa melihat isi HTTP Header (bisa merouting ke server berbeda berdasarkan URL `/api` atau `/images`).',
+      why: 'Saat API Anda lambat, masalahnya bisa di L7 (query lambat), di L4 (TCP handshake lambat), atau L3 (routing internet/DNS bermasalah). Memahami OSI Model memandu proses *troubleshooting* dari atas ke bawah.',
+      mistake: 'Mencoba melakukan load balancing pada trafik gRPC menggunakan L4 Load Balancer klasik. gRPC menahan koneksi TCP tetap hidup (multiplexing). L4 LB hanya melakukan balance pada awal TCP connection, sehingga semua traffic gRPC akan menumpuk di satu server backend. Harus menggunakan L7 LB.',
+      interview: [
+        {
+          q: 'Jelaskan perbedaan mendasar antara Layer 4 Load Balancer dan Layer 7 Load Balancer.',
+          a: 'L4 beroperasi di level Transport (TCP/UDP). Ia tidak tahu apa isi pesan (tidak bisa baca HTTP header, path, cookies). Ia hanya merouting trafik berdasarkan IP dan Port. Keunggulannya: sangat cepat dan memakan resource sangat kecil. L7 beroperasi di level Application (HTTP). Ia menghentikan trafik, membaca isi pesan (headers, URL path), baru memutuskan merouting ke mana. Ia bisa melakukan SSL Termination, caching, dan routing spesifik. Kelemahannya: memakan CPU lebih besar.'
+        }
+      ],
+      code: '// L4 Load Balancer Logic (Pseudo)\nif (request.port === 80) routeTo(ServerA_IP)\n\n// L7 Load Balancer Logic (Pseudo)\nif (request.path === "/api/users") routeTo(UserService_IP)\nif (request.cookie.includes("admin=true")) routeTo(AdminPool_IP)'
+    },
+    {
+      id: 'cors-and-auth-101',
+      title: 'CORS & Auth Fundamentals 101',
+      depth: 'Same-Origin Policy, Preflight, and Stateful Sessions',
+      content: 'Sebelum pusing dengan JWT dan OAuth, pahami batasan paling dasar di browser.\n\n**SOP & CORS:** Browser memiliki mekanisme keamanan *Same-Origin Policy (SOP)*. Script di `domain-a.com` dilarang membaca data dari `domain-b.com`. Tapi seringkali kita butuh akses tersebut (misal frontend dan backend pisah domain). Solusinya: **CORS (Cross-Origin Resource Sharing)**. Server `domain-b.com` harus mengirimkan header `Access-Control-Allow-Origin: https://domain-a.com`.\n**Preflight Request:** Jika request Anda kompleks (misal menggunakan metode PUT/DELETE atau header kustom seperti `Authorization`), browser akan mengirimkan request `OPTIONS` (Preflight) terlebih dahulu untuk bertanya ke server "Bolehkah saya mengirim request ini?". Jika server menjawab "Boleh", baru request aslinya dikirim.\n\n**Stateful Sessions vs Stateless:**\n- **Session (Stateful):** User login -> Server menyimpan data user di memory/DB dan memberikan `Session ID` ke browser -> Browser menyimpan di *Cookie* dan otomatis mengirimkannya di request berikutnya. Kelemahan: Jika server di-restart atau user masuk ke server lain (load balancing), session hilang (kecuali pakai Redis).\n- **Token (Stateless):** Server tidak menyimpan apa-apa. Semua data user dienkripsi/di-sign ke dalam Token (JWT) dan diberikan ke klien. Klien mengirimkannya lewat header. Skalabilitas tinggi, tapi token sulit di-revoke/dibatalkan sebelum expired.',
+      why: 'CORS error adalah mimpi buruk paling umum bagi web developer baru. Paham bahwa CORS adalah mekanisme browser (bukan server) akan mengubah cara Anda men-debug. Memahami Session vs Token adalah akar dari semua perdebatan arsitektur autentikasi.',
+      mistake: 'Mengira bahwa men-disable CORS di server berarti membuat server aman. Salah! CORS adalah proteksi untuk *client/browser*. Script bot (curl, postman) mengabaikan aturan CORS dan bisa menembak server Anda kapan saja jika tidak dilindungi autentikasi.',
+      interview: [
+        {
+          q: 'Kenapa tiba-tiba browser mengirimkan method OPTIONS sebelum request POST saya?',
+          a: 'Itu adalah Preflight Request dari mekanisme CORS. Browser melakukannya untuk request yang "tidak sederhana" (non-simple request), seperti mengandung header "Authorization" atau "Content-Type: application/json". Tujuannya untuk memverifikasi apakah server mengizinkan request tersebut dari origin domain saat ini. Server harus merespon OPTIONS dengan status 200/204 dan header CORS yang sesuai.'
+        }
+      ],
+      code: '// Typical Express CORS Middleware\napp.use((req, res, next) => {\n  // Who is allowed to access\n  res.header("Access-Control-Allow-Origin", "https://myfrontend.com");\n  // What methods are allowed\n  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");\n  // What headers the frontend can send\n  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");\n\n  // Handle preflight immediately\n  if (req.method === "OPTIONS") return res.sendStatus(200);\n  next();\n});'
+    },
+    {
       id: 'tcp-udp-dns',
       title: 'TCP vs UDP & DNS Resolution',
       depth: 'TCP 3-way handshake, congestion control, UDP trade-offs, DNS lifecycle',

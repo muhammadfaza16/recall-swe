@@ -5,6 +5,36 @@ export const pillar5: Pillar = {
   title: 'Pillar 5 — Backend (Node.js)',
   topics: [
     {
+      id: 'backend-architecture-101',
+      title: 'Backend Architecture 101',
+      depth: 'MVC and Layered Architecture',
+      content: 'Membuat endpoint di `app.get()` itu mudah. Menjaga ratusan endpoint agar tidak menjadi "Spaghetti Code" adalah pekerjaan arsitektural.\n\n**Layered Architecture (N-Tier):** Memisahkan *concern* aplikasi ke dalam lapisan horizontal. Minimal 3 layer:\n1. **Router / Controller Layer:** Pintu gerbang. Tugasnya HANYA menerima request HTTP (req, res), memvalidasi input (JSON body/query), dan memanggil Service Layer. Controller **DILARANG** mengandung logika bisnis (perhitungan, aturan).\n2. **Service Layer (Business Logic):** Otak aplikasi. Di sinilah aturan bisnis berada (contoh: "User tidak boleh ditarik saldonya jika < 0"). Service tidak tahu menahu soal HTTP (req, res). Ia murni logika kode.\n3. **Data Access / Repository Layer:** Lapisan terbawah yang berbicara dengan Database (SQL/NoSQL) atau external API. Service tidak menulis query SQL; Service memanggil `UserRepository.find()`.\n\nMengapa repot-repot? Karena jika Anda ingin mengganti HTTP Express dengan gRPC besok, atau mengganti MySQL dengan MongoDB, Anda cukup mengganti Controller atau Repository-nya. **Service Layer (Business Logic) tetap utuh!**',
+      why: 'Tanpa arsitektur layered, developer baru cenderung menulis query database directly di dalam file Controller. Akibatnya kode tidak bisa di-unit test (karena controller terikat dengan objek HTTP Request/Response) dan sangat rentan terhadap duplikasi jika endpoint lain butuh query yang sama.',
+      mistake: 'Fat Controller: Menulis ratusan baris kode logika bisnis, query DB, dan kalkulasi di dalam blok `app.post()`. Jika Anda menulis query SQL atau `axios.post` langsung di controller HTTP, arsitektur Anda gagal.',
+      interview: [
+        {
+          q: 'Mengapa Business Logic (Service Layer) tidak boleh menerima parameter req dan res dari HTTP?',
+          a: 'Prinsip Separation of Concerns (SoC) dan Testability. Jika fungsi Service menerima req dan res, fungsi tersebut selamanya terikat pada konteks web server (Express/Fastify). Jika esok hari kita ingin mengeksekusi logika yang sama melalui sebuah CRON Job (di background, tanpa HTTP request) atau via CLI, kita tidak bisa. Selain itu, untuk melakukan unit test pada Service yang terikat req/res, kita harus repot mem-mock objek HTTP yang kompleks.'
+        }
+      ],
+      code: '// FAT CONTROLLER (BAD)\napp.post("/withdraw", async (req, res) => {\n  const user = await db.query("SELECT * FROM users WHERE id = ?", [req.body.id]);\n  if (user.balance < req.body.amount) return res.status(400).send("No funds");\n  await db.query("UPDATE users SET balance = balance - ?", [req.body.amount]);\n  return res.send("OK");\n});\n\n// LAYERED ARCHITECTURE (GOOD)\n// Controller (Only handles HTTP)\nclass WalletController {\n  async withdraw(req, res) {\n    const result = await WalletService.processWithdrawal(req.body.id, req.body.amount);\n    return res.json(result);\n  }\n}\n// Service (Only handles Business Logic)\nclass WalletService {\n  async processWithdrawal(userId, amount) {\n    const balance = await UserRepository.getBalance(userId);\n    if (balance < amount) throw new Error("No funds");\n    return await UserRepository.deductBalance(userId, amount);\n  }\n}'
+    },
+    {
+      id: 'middleware-pattern',
+      title: 'The Middleware Pattern',
+      depth: 'Request Interceptors and Chain of Responsibility',
+      content: 'Di backend modern, sangat sedikit logika yang ditaruh langsung di controller. Sebagian besar hal-hal umum (Cross-Cutting Concerns) di-handle oleh **Middleware**.\n\nMiddleware adalah fungsi yang memiliki akses ke object `request`, `response`, dan fungsi `next()`. Mereka berbaris layaknya pipa (pipeline). Saat request masuk, ia melewati pipa ini secara berurutan. Di setiap titik, middleware bisa:\n1. Memodifikasi `req` (misal: menambahkan `req.user` hasil validasi JWT).\n2. Menghentikan request dan mengirim response langsung (misal: membalas 401 Unauthorized jika token tidak ada).\n3. Meneruskan request ke middleware berikutnya dengan memanggil `next()`.\n\n**Contoh Penggunaan:** Autentikasi (JWT check), Logging (mencatat IP dan waktu), Body Parsing (mengurai JSON string jadi Object), CORS header attachment, dan Error Handling (menangkap *throw error* di ujung pipa).',
+      why: 'Memahami Middleware Pattern adalah kunci untuk bekerja dengan Node.js (Express, NestJS) atau Go (Gin, Echo). Tanpa middleware, Anda akan meng-copy-paste logika "cek token" di setiap 100 endpoint API Anda.',
+      mistake: 'Lupa memanggil `next()` di dalam blok middleware. Request akan menggantung (hang) karena pipa berhenti. Dan memanggil `res.send()` tapi kemudian tetap memanggil `next()`, yang memicu error fatal "Cannot set headers after they are sent to the client".',
+      interview: [
+        {
+          q: 'Bagaimana cara Anda men-setup Error Handler Global (Catch-all) di framework seperti Express, dan mengapa itu penting?',
+          a: 'Di Express, Global Error Handler adalah middleware khusus dengan 4 parameter: (err, req, res, next), yang ditaruh di URUTAN PALING AKHIR setelah semua rute. Ini penting karena jika terjadi error di dalam endpoint mana pun, kita cukup memanggil next(err) atau men-throw error (di framework modern), dan error tersebut akan ditangkap di satu tempat sentral. Di tempat sentral inilah kita menyembunyikan stack trace dari user (hanya di env dev), me-log error ke sistem (Sentry), dan mengirim response JSON baku berformat 500 Internal Server Error secara konsisten.'
+        }
+      ],
+      code: '// THE PIPELINE MENTAL MODEL\n// Request -> Middleware 1 -> Middleware 2 -> Controller -> Response\n\n// Auth Middleware Example\nconst requireAuth = (req, res, next) => {\n  const token = req.headers.authorization;\n  if (!token) {\n    return res.status(401).json({ error: "Missing token" }); // Stops pipeline!\n  }\n  \n  const user = verifyJWT(token);\n  req.user = user; // Attach user to request for the controller to use\n  next(); // Pass to the next function\n}\n\n// Applying middleware\napp.get("/api/dashboard", requireAuth, (req, res) => {\n  // This code only runs if requireAuth calls next()\n  res.send("Welcome " + req.user.name);\n});'
+    },
+    {
       id: 'node-architecture',
       title: 'Node.js Architecture & libuv',
       depth: 'V8 + libuv + thread pool + event loop phases',

@@ -5,6 +5,21 @@ export const pillar1: Pillar = {
   title: 'Pillar 1 — System Foundations',
   topics: [
     {
+      id: 'os-fundamentals-101',
+      title: 'Operating System 101',
+      depth: 'Process vs Thread, Context Switching, Virtual Memory',
+      content: 'Sebelum membahas konkurensi (Concurrency), kita harus tahu apa yang diatur oleh Operating System (OS).\n\n**Process vs Thread:**\n- **Process:** Program yang sedang berjalan. Process bersifat *terisolasi*; memiliki ruang memorinya (heap) sendiri. Jika Process A crash, Process B tetap hidup.\n- **Thread:** Unit eksekusi di dalam sebuah Process. Semua Thread di dalam satu Process **berbagi ruang memori yang sama**. Ini membuat komunikasi antar Thread sangat cepat, tapi sangat berbahaya (rawan Race Condition).\n\n**Context Switching:** CPU core hanya bisa mengerjakan satu tugas di satu waktu (kecuali multi-core). Agar terasa *multitasking*, OS melakukan *Context Switch*: menyimpan *state* Thread lama, meload *state* Thread baru, lalu menjalankannya. Proses ini **mahal** (memakan siklus CPU). Terlalu banyak Thread = CPU sibuk berganti konteks, bukan mengerjakan tugas.\n\n**Virtual Memory & Paging:** OS menipu program. Program merasa ia memiliki RAM tanpa batas yang utuh (Virtual Memory). Di belakang layar, OS memetakan blok memori virtual ini (Pages) ke RAM fisik sebenarnya. Jika RAM penuh, OS memindahkan sebagian memori ke Hard Disk (*Swap*). Ini sebabnya aplikasi tiba-tiba melambat drastis saat RAM penuh (*thrashing*).',
+      why: 'Backend developer yang tidak paham beda Process dan Thread tidak akan mengerti mengapa Node.js (Single Threaded Process) arsitekturnya berbeda dengan Java/Tomcat (Multi-Threaded). Paham OS berarti paham limitasi hardware.',
+      mistake: 'Membuka 10.000 thread untuk menangani 10.000 koneksi bersamaan (Thread-per-request model). Ini akan menghancurkan server karena RAM habis (setiap thread butuh ~1MB stack) dan CPU habis hanya untuk Context Switching. Ini alasan Nginx dan Node.js menggunakan Event Loop.',
+      interview: [
+        {
+          q: 'Mengapa membuat Thread baru jauh lebih "murah" daripada membuat Process baru?',
+          a: 'Karena Process baru membutuhkan alokasi ruang memori yang sepenuhnya baru dan terisolasi dari OS. Sedangkan Thread baru lahir di dalam ruang memori Process yang sudah ada (hanya butuh alokasi Stack kecil, sementara Heap dan Code-nya berbagi). Karenanya, inter-thread communication jauh lebih cepat dari Inter-Process Communication (IPC).'
+        }
+      ],
+      code: '// Mental Model\n\n// PROCESS A (Chrome)\n// ├── Memory Heap A (Terisolasi)\n// ├── Thread 1 (UI Render)\n// └── Thread 2 (Network)\n\n// PROCESS B (Spotify)\n// ├── Memory Heap B (Terisolasi)\n// └── Thread 1 (Audio Decode)'
+    },
+    {
       id: 'memory-management',
       title: 'Memory: Stack, Heap & Garbage Collection',
       depth: 'How programs manage memory — V8, Go GC, escape analysis',

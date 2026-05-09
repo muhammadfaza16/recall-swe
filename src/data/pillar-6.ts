@@ -5,6 +5,21 @@ export const pillar6: Pillar = {
   title: 'Pillar 6 — Backend (Golang)',
   topics: [
     {
+      id: 'di-ioc-101',
+      title: 'Dependency Injection (DI) & IoC',
+      depth: 'Interfaces and Testability Basics',
+      content: 'Meskipun Go tidak memiliki *Class*, ia menggunakan *Struct* dan *Interface* secara intensif untuk *Dependency Injection* (DI). DI adalah implementasi dari *Inversion of Control* (IoC).\n\n**Masalah Tanpa DI (Hardcoded Dependencies):** Jika Service A membutuhan koneksi Database B, dan Anda membuat objek koneksi B langsung *di dalam* constructor A, maka A berpasangan ketat (*tight coupling*) dengan B. Anda tidak bisa men-test A tanpa ikut menyalakan database B.\n\n**Solusi dengan DI:** Service A tidak membuat koneksi B. Ia HANYA meminta B disuntikkan (*injected*) lewat parameter constructor-nya. \n\n**Peran Interface:** Daripada Service A meminta *object konkrit* B (misal struct `PostgresDB`), A harus meminta *Interface* (misal `DataStore` yang punya fungsi `Save()`). Dengan begitu, saat *production*, kita suntikkan struct `PostgresDB`. Saat *Unit Testing*, kita suntikkan struct `MockDB` (yang ada di RAM). Kode Service A tidak peduli (dan tidak perlu diubah)!',
+      why: 'Dependency Injection adalah satu-satunya cara arsitektur modern (Clean Architecture/Hexagonal) untuk mencapai unit test 100% tanpa menyentuh network atau real database. Go secara bawaan sangat mendukung pola ini melalui implicit interfaces.',
+      mistake: 'Menggunakan *Global Variables* atau *Singletons* di backend untuk menyimpan instance Database atau konfigurasi. Hal ini merusak *Testability* dan seringkali memicu *Race Conditions* pada proses *concurrent* di server skala besar.',
+      interview: [
+        {
+          q: 'Jelaskan konsep Dependency Injection secara sederhana. Mengapa ini krusial untuk Unit Testing?',
+          a: 'Dependency Injection artinya: "Jangan buat apa yang Anda butuhkan, mintalah agar diberikan". Alih-alih fungsi Service meng-instantiate DB Client di dalamnya, ia meminta DB Client melalui parameternya. Ini krusial di Unit Testing karena kita tidak mau tes kita mengenai production DB. Dengan DI, pada saat di test file, kita bisa dengan mudah me-lempar Fake/Mock DB Client (yang menyimpan data di array memory) ke dalam Service. Jika dependency di-hardcode di dalam Service, kita tidak bisa menggantinya dengan mock.'
+        }
+      ],
+      code: '// BAD: Hardcoded dependency (Cannot mock DB for testing)\nfunc NewUserService() *UserService {\n    return &UserService{\n        db: sql.Open("postgres", "url..."), // Tied to actual DB!\n    }\n}\n\n// GOOD: Dependency Injection with Interfaces\n// 1. Define what you need (Interface)\ntype UserRepository interface {\n    FindUser(id string) (*User, error)\n}\n\n// 2. Struct only knows about the interface\ntype UserService struct {\n    repo UserRepository \n}\n\n// 3. Inject the dependency\nfunc NewUserService(r UserRepository) *UserService {\n    return &UserService{ repo: r }\n}\n\n// In main.go (Production):\n// svc := NewUserService(&PostgresRepo{})\n\n// In user_test.go (Testing):\n// svc := NewUserService(&MockMemoryRepo{})'
+    },
+    {
       id: 'go-scheduler',
       title: 'Go Runtime & Goroutine Scheduler',
       depth: 'G/M/P model, work stealing, goroutine lifecycle',
